@@ -1,5 +1,6 @@
 #include "HopfieldNetwork.h"
 
+#include <bit>
 #include <cassert>
 #include <cmath>
 #include <algorithm>
@@ -22,7 +23,19 @@ HopfieldNetwork<DIM>::HopfieldNetwork(uint64_t rng_seed, size_t reach, float bet
 {
     assert(reach_ >= 1 && reach_ <= DIM);
     assert(beta_ > 0.0f);
+    BuildMaskTable();
     Initialize();
+}
+
+template <size_t DIM>
+void HopfieldNetwork<DIM>::BuildMaskTable()
+{
+    conn_masks_.clear();
+    for (uint32_t m = 1; m < N; ++m)
+    {
+        if (static_cast<size_t>(std::popcount(m)) <= reach_)
+            conn_masks_.push_back(m);
+    }
 }
 
 template <size_t DIM>
@@ -90,10 +103,12 @@ float HopfieldNetwork<DIM>::Energy(const float* state) const
 {
     // Modern Hopfield energy: per-vertex log-sum-exp of pattern similarities.
     // E(s) = -(1/N) * sum_v [ beta^-1 * log(sum_mu exp(beta * sim_mu(v))) ]
-    // where sim_mu(v) sums over nearest + shell neighbors of v.
+    // where sim_mu(v) sums over Hamming-ball neighbors of v.
     if (num_patterns_ == 0) return 0.0f;
 
     const float inv_beta = 1.0f / beta_;
+    const uint32_t* masks = conn_masks_.data();
+    const size_t num_masks = conn_masks_.size();
     float energy = 0.0f;
 
     #pragma omp parallel reduction(+:energy)
@@ -105,25 +120,21 @@ float HopfieldNetwork<DIM>::Energy(const float* state) const
         {
             float max_sim = -std::numeric_limits<float>::max();
 
-            // Single pass: compute and store all similarities
             for (size_t mu = 0; mu < num_patterns_; ++mu)
             {
                 const float* p = patterns_.data() + mu * N;
                 float s = 0.0f;
 
-                // Nearest neighbors: single-bit-flip masks (standard hypercube edges)
-                for (size_t i = 0; i < DIM; ++i)
-                    s += p[v ^ NearestMask(i)] * state[v ^ NearestMask(i)];
-
-                // Hamming shells: cumulative-bit masks (long-range mixing)
-                for (size_t i = 0; i < reach_; ++i)
-                    s += p[v ^ ShellMask(i)] * state[v ^ ShellMask(i)];
+                for (size_t c = 0; c < num_masks; ++c)
+                {
+                    const size_t nb = v ^ masks[c];
+                    s += p[nb] * state[nb];
+                }
 
                 sim[mu] = s;
                 if (s > max_sim) max_sim = s;
             }
 
-            // Log-sum-exp with shift for numerical stability
             float sum_exp = 0.0f;
             for (size_t mu = 0; mu < num_patterns_; ++mu)
                 sum_exp += std::exp(beta_ * (sim[mu] - max_sim));
@@ -148,8 +159,8 @@ void HopfieldNetwork<DIM>::UpdateVertex(size_t v)
 
     // Modern Hopfield update via softmax attention over stored patterns.
     //
-    // 1. Compute local similarity to each pattern through dual-mask neighbors:
-    //      sim_mu = sum over nearest neighbors + Hamming shells
+    // 1. Compute similarity to each pattern through Hamming-ball neighbors:
+    //      sim_mu = sum over all nb where popcount(v ^ nb) <= reach
     //
     // 2. Apply softmax with inverse temperature beta:
     //      alpha_mu = exp(beta * sim_mu) / sum_mu exp(beta * sim_mu)
@@ -158,7 +169,8 @@ void HopfieldNetwork<DIM>::UpdateVertex(size_t v)
     //      h_v = sum_mu alpha_mu * pattern[mu][v]
     //      s_v = sign(h_v)
 
-    // --- Compute similarities (reuse member buffer) ---
+    const uint32_t* masks = conn_masks_.data();
+    const size_t num_masks = conn_masks_.size();
     float max_sim = -std::numeric_limits<float>::max();
     float* sim = sim_buf_.data();
 
@@ -167,13 +179,11 @@ void HopfieldNetwork<DIM>::UpdateVertex(size_t v)
         const float* p = patterns_.data() + mu * N;
         float s = 0.0f;
 
-        // Nearest neighbors: single-bit-flip masks (standard hypercube edges)
-        for (size_t i = 0; i < DIM; ++i)
-            s += p[v ^ NearestMask(i)] * vtx_state_[v ^ NearestMask(i)];
-
-        // Hamming shells: cumulative-bit masks (long-range mixing)
-        for (size_t i = 0; i < reach_; ++i)
-            s += p[v ^ ShellMask(i)] * vtx_state_[v ^ ShellMask(i)];
+        for (size_t c = 0; c < num_masks; ++c)
+        {
+            const size_t nb = v ^ masks[c];
+            s += p[nb] * vtx_state_[nb];
+        }
 
         sim[mu] = s;
         if (s > max_sim) max_sim = s;

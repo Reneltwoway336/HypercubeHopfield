@@ -46,7 +46,7 @@ public:
         for (uint64_t seed : seeds)
         {
             std::mt19937_64 rng(seed + 4000);
-            auto net = HopfieldNetwork<DIM>::Create(rng(), 3, 4.0f);
+            auto net = HopfieldNetwork<DIM>::Create(rng());
 
             float patterns[num_patterns][N];
             for (size_t p = 0; p < num_patterns; ++p)
@@ -116,8 +116,8 @@ private:
             std::fprintf(md, "This diagnoses whether attractors are clean and well-separated, or whether\n");
             std::fprintf(md, "the network converges to spurious states that blend multiple patterns.\n\n");
             std::fprintf(md, "---\n\n");
-            std::fprintf(md, "Run: DIM=%zu | N=%zu | reach=3 | beta=4.0 | 5 patterns | noise=20%% | 3-seed avg {42,1042,2042}\n\n",
-                         DIM, N);
+            std::fprintf(md, "Run: DIM=%zu | N=%zu | reach=%zu | beta=4.0 | 5 patterns | noise=20%% | 3-seed avg {42,1042,2042}\n\n",
+                         DIM, N, DIM / 2);
             std::fprintf(md, "## Results\n\n");
         }
 

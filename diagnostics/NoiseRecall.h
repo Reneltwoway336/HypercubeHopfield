@@ -44,7 +44,7 @@ public:
             for (uint64_t seed : seeds)
             {
                 std::mt19937_64 rng(seed + lvl * 1000);
-                auto net = HopfieldNetwork<DIM>::Create(rng(), 3, 4.0f);
+                auto net = HopfieldNetwork<DIM>::Create(rng());
 
                 float pattern[N];
                 GenerateRandomPattern<N>(pattern, rng);
@@ -93,8 +93,8 @@ private:
             std::fprintf(md, "product) between the recalled state and the original is measured. An overlap\n");
             std::fprintf(md, "of 1.0 means perfect recall; 0.0 means uncorrelated.\n\n");
             std::fprintf(md, "---\n\n");
-            std::fprintf(md, "Run: DIM=%zu | N=%zu | reach=3 | beta=4.0 | 3-seed avg {42,1042,2042}\n\n",
-                         DIM, N);
+            std::fprintf(md, "Run: DIM=%zu | N=%zu | reach=%zu | beta=4.0 | 3-seed avg {42,1042,2042}\n\n",
+                         DIM, N, DIM / 2);
             std::fprintf(md, "## Results\n\n");
         }
 
@@ -114,7 +114,7 @@ private:
         else
         {
             std::fprintf(md, "- **Recall failed at one or more noise thresholds.** The attractor basins\n");
-            std::fprintf(md, "  may be too shallow at this configuration (reach=3, beta=4.0).\n");
+            std::fprintf(md, "  may be too shallow at this configuration.\n");
         }
     }
 };

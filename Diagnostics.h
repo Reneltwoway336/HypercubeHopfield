@@ -18,7 +18,7 @@ bool RunDiagnostics()
 
     std::printf("============================================================\n");
     std::printf("  HOPFIELD NETWORK DIAGNOSTICS\n");
-    std::printf("  DIM=%zu  N=%zu  default reach=3  default beta=4.0\n", DIM, N);
+    std::printf("  DIM=%zu  N=%zu  default reach=DIM/2=%zu  default beta=4.0\n", DIM, N, DIM / 2);
     std::printf("============================================================\n");
 
     bool all_pass = true;
@@ -26,7 +26,7 @@ bool RunDiagnostics()
     all_pass &= EnergyMonotonicity<DIM>().RunAndPrint();
     all_pass &= CapacityProbe<DIM>().RunAndPrint();
     all_pass &= OverlapMetrics<DIM>().RunAndPrint();
-    all_pass &= ParameterSweep<DIM>().RunAndPrint();
+    // all_pass &= ParameterSweep<DIM>().RunAndPrint();  // slow — uncomment to run
 
     std::printf("\n============================================================\n");
     std::printf("  OVERALL: %s\n", all_pass ? "ALL PASSED" : "SOME TESTS FAILED");

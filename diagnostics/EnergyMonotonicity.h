@@ -39,7 +39,7 @@ public:
         for (uint64_t seed : DiagSeeds())
         {
             std::mt19937_64 rng(seed + 2000);
-            auto net = HopfieldNetwork<DIM>::Create(rng(), 3, 4.0f);
+            auto net = HopfieldNetwork<DIM>::Create(rng());
 
             // Store 3 patterns
             float pattern[N];
@@ -122,8 +122,8 @@ private:
             std::fprintf(md, "The modern Hopfield energy is:\n\n");
             std::fprintf(md, "    E(s) = -(1/N) * sum_v [ beta^-1 * log(sum_mu exp(beta * sim_mu(v))) ]\n\n");
             std::fprintf(md, "---\n\n");
-            std::fprintf(md, "Run: DIM=%zu | N=%zu | reach=3 | beta=4.0 | 3 stored patterns | 3-seed {42,1042,2042}\n\n",
-                         DIM, N);
+            std::fprintf(md, "Run: DIM=%zu | N=%zu | reach=%zu | beta=4.0 | 3 stored patterns | 3-seed {42,1042,2042}\n\n",
+                         DIM, N, DIM / 2);
             std::fprintf(md, "## Results\n\n");
         }
     }

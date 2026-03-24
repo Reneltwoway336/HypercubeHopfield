@@ -7,12 +7,12 @@
 
 int main()
 {
-    constexpr size_t DIM = 7;
+    constexpr size_t DIM = 8;
     constexpr size_t N = 1ULL << DIM;
 
-    auto net = HopfieldNetwork<DIM>::Create(42);  // default reach=3, beta=4.0
+    auto net = HopfieldNetwork<DIM>::Create(42);  // default reach=DIM/2, beta=4.0
 
-    std::printf("HypercubeHopfield DIM=%zu  N=%zu  connections=%zu (DIM nearest + %zu shells)  beta=%.1f\n",
+    std::printf("HypercubeHopfield DIM=%zu  N=%zu  connections=%zu (Hamming ball radius=%zu)  beta=%.1f\n",
                 net->dim, net->num_vertices, net->NumConnections(), net->Reach(), net->Beta());
 
     // Generate a random pattern (+1/-1)

@@ -24,7 +24,7 @@ public:
 
     bool RunAndPrint()
     {
-        constexpr size_t reach_vals[] = {1, 2, 3, 5, DIM};
+        constexpr size_t reach_vals[] = {1, 2, DIM / 2, DIM - 1, DIM};
         constexpr float beta_vals[] = {1.0f, 2.0f, 4.0f, 8.0f, 16.0f};
         constexpr size_t num_reach = sizeof(reach_vals) / sizeof(reach_vals[0]);
         constexpr size_t num_beta = sizeof(beta_vals) / sizeof(beta_vals[0]);

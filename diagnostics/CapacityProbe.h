@@ -54,7 +54,7 @@ public:
             for (uint64_t seed : DiagSeeds())
             {
                 std::mt19937_64 rng(seed * 10000 + count);
-                auto net = HopfieldNetwork<DIM>::Create(rng(), 3, 4.0f);
+                auto net = HopfieldNetwork<DIM>::Create(rng());
 
                 std::vector<float> patterns(count * N);
                 for (size_t p = 0; p < count; ++p)
@@ -123,8 +123,8 @@ private:
             std::fprintf(md, "in N. This diagnostic measures the empirical limit on the sparse hypercube\n");
             std::fprintf(md, "topology with dual-mask connectivity (DIM nearest + reach shells).\n\n");
             std::fprintf(md, "---\n\n");
-            std::fprintf(md, "Run: DIM=%zu | N=%zu | reach=3 | beta=4.0 | noise=20%% | 3-seed avg {42,1042,2042}\n\n",
-                         DIM, N);
+            std::fprintf(md, "Run: DIM=%zu | N=%zu | reach=%zu | beta=4.0 | noise=20%% | 3-seed avg {42,1042,2042}\n\n",
+                         DIM, N, DIM / 2);
             std::fprintf(md, "## Results\n\n");
         }
 
