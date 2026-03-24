@@ -92,7 +92,7 @@ a weight matrix). This enables:
 
 | Parameter    | Description                                      | Default  |
 |--------------|--------------------------------------------------|----------|
-| DIM          | Hypercube dimension (5-10)                       | Template |
+| DIM          | Hypercube dimension (4-16)                       | Template |
 | reach        | Hamming-ball radius (1-DIM)                      | DIM/2    |
 | beta         | Inverse temperature for softmax attention        | 4.0      |
 | connectivity | Fraction of Hamming ball to use (0.0-1.0)        | 1.0      |

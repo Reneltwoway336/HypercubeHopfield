@@ -22,7 +22,7 @@ cmake --build cmake-build-release
 ## Architecture
 
 Modern Hopfield associative memory network (Ramsauer et al., 2021) on a Boolean
-hypercube (2^DIM vertices, DIM 5-10). Uses exponential energy with explicit pattern
+hypercube (2^DIM vertices, DIM 4-16). Uses exponential energy with explicit pattern
 storage and softmax-attention retrieval for exponential memory capacity.
 
 Connectivity uses Hamming-ball neighbors: all vertices within Hamming distance `reach`

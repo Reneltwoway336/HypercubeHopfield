@@ -33,7 +33,7 @@
 template <size_t DIM>
 class HopfieldNetwork
 {
-    static_assert(DIM >= 5 && DIM <= 10, "DIM must be in 5 <= DIM <= 10");
+    static_assert(DIM >= 4 && DIM <= 16, "DIM must be in 4 <= DIM <= 16");
 
     static constexpr size_t N = 1ULL << DIM;
 

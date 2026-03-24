@@ -17,17 +17,38 @@
 /// At high pattern counts, tests a random sample of patterns (default 64) rather
 /// than all M, reducing the cost from O(M^2) to O(M). The recall tests within
 /// each seed are parallelized across threads via OMP.
+///
+/// The default ceiling is scaled per DIM to target ~5 minute runtime at default
+/// reach=DIM/2. Override max_patterns in the constructor to probe deeper.
 template <size_t DIM>
 class CapacityProbe
 {
     static constexpr size_t N = 1ULL << DIM;
 
+    /// Intelligent default ceiling scaled by DIM.
+    /// Cost per step ~ M * connections * N * samples * seeds.
+    /// Connections ~ N/2 at reach=DIM/2, so cost ~ M * N^2.
+    /// Calibrated so the full geometric probe completes in ~5 minutes.
+    static constexpr size_t DefaultCeiling()
+    {
+        // DIM=8 baseline: 64K patterns, N=256, cost factor = 256^2 = 65536
+        // For other DIMs: ceiling = 64K * 65536 / N^2, clamped to [64, 1M]
+        constexpr size_t baseline = 65536;          // 64K patterns at DIM=8
+        constexpr size_t base_n2 = 256ULL * 256;    // N^2 at DIM=8
+        constexpr size_t n2 = N * N;
+        constexpr size_t raw = baseline * base_n2 / n2;
+        // Clamp: at least 64 (meaningful probe), at most 4M (memory limit)
+        if (raw < 64) return 64;
+        if (raw > 1048576) return 1048576;
+        return raw;
+    }
+
 public:
-    /// @param max_patterns Upper limit on patterns to test. Default 4*N is fast;
-    ///                     set higher (e.g., 256*N) to find the true ceiling.
+    /// @param max_patterns Upper limit on patterns to test. Default is scaled
+    ///                     per DIM to target ~5 min runtime. Override to probe deeper.
     /// @param max_test_samples Max patterns to test per count per seed. At counts
     ///                         above this, a random sample is tested instead of all.
-    explicit CapacityProbe(size_t max_patterns = 4 * N, size_t max_test_samples = 64)
+    explicit CapacityProbe(size_t max_patterns = DefaultCeiling(), size_t max_test_samples = 64)
         : max_patterns_(max_patterns), max_test_samples_(max_test_samples) {}
 
     bool RunAndPrint()
@@ -39,7 +60,7 @@ public:
         if (!md)
             std::printf("  (warning: could not create diagnostics/CapacityProbe.md)\n");
 
-        PrintHeader(md, max_test_samples_);
+        PrintHeader(md, max_patterns_, max_test_samples_);
 
         size_t capacity = 0;
         bool dropped = false;
@@ -140,20 +161,23 @@ public:
                 dropped = true;
 
             const char* sampled = (test_count < count) ? "*" : " ";
-            Tee(md, Fmt("|%s%5d | %9.4f | %8.4f | %6.1f |%s|\n",
-                sampled, static_cast<int>(count), mean_overlap, min_overlap, avg_sweeps, status));
+            Tee(md, Fmt("|%s%5zu | %9.4f | %8.4f | %6.1f |%s|\n",
+                sampled, count, mean_overlap, min_overlap, avg_sweeps, status));
 
             if (mean_overlap < 0.50f && count > 4)
                 break;
         }
 
-        Tee(md, Fmt("\nCapacity (overlap >= %.0f%%): %d patterns (%.2f%% of N=%d)\n",
-            threshold * 100.0f, static_cast<int>(capacity),
-            100.0f * static_cast<float>(capacity) / static_cast<float>(N),
-            static_cast<int>(N)));
+        const bool hit_ceiling = !dropped && (capacity == counts.back());
+        const char* prefix = hit_ceiling ? ">= " : "";
+        Tee(md, Fmt("\nCapacity (overlap >= %.0f%%): %s%zu patterns (%.2f%% of N=%zu)\n",
+            threshold * 100.0f, prefix, capacity,
+            100.0f * static_cast<float>(capacity) / static_cast<float>(N), N));
+        if (hit_ceiling)
+            Tee(md, "(ceiling reached — increase max_patterns to probe higher)\n");
         Tee(md, Fmt("Result: **%s**\n", capacity > 0 ? "PASS" : "FAIL"));
 
-        WriteFindings(md, capacity);
+        WriteFindings(md, capacity, hit_ceiling);
 
         if (md) std::fclose(md);
         return capacity > 0;
@@ -163,9 +187,9 @@ private:
     size_t max_patterns_;
     size_t max_test_samples_;
 
-    static void PrintHeader(FILE* md, size_t max_samples)
+    static void PrintHeader(FILE* md, size_t max_patterns, size_t max_samples)
     {
-        std::printf("\n--- [3/5] CapacityProbe ---\n");
+        std::printf("\n--- [3/5] CapacityProbe (ceiling=%zu) ---\n", max_patterns);
 
         if (md)
         {
@@ -181,8 +205,8 @@ private:
             std::fprintf(md, "At high pattern counts, a random sample of %zu patterns is tested per seed\n", max_samples);
             std::fprintf(md, "rather than all M (marked with * in the table).\n\n");
             std::fprintf(md, "---\n\n");
-            std::fprintf(md, "Run: DIM=%zu | N=%zu | reach=%zu | beta=4.0 | noise=20%% | 3-seed avg {42,1042,2042}\n\n",
-                         DIM, N, DIM / 2);
+            std::fprintf(md, "Run: DIM=%zu | N=%zu | reach=%zu | beta=4.0 | noise=20%% | ceiling=%zu | 3-seed avg {42,1042,2042}\n\n",
+                         DIM, N, DIM / 2, max_patterns);
             std::fprintf(md, "## Results\n\n");
         }
 
@@ -190,17 +214,26 @@ private:
         Tee(md, "|-------|-----------|----------|--------|--------|\n");
     }
 
-    static void WriteFindings(FILE* md, size_t capacity)
+    static void WriteFindings(FILE* md, size_t capacity, bool hit_ceiling)
     {
         if (!md) return;
         std::fprintf(md, "\n## Findings\n\n");
-        std::fprintf(md, "- **Empirical capacity: %zu patterns.** ", capacity);
-        const float ratio = static_cast<float>(capacity) / static_cast<float>(N);
-        if (ratio > 0.14f)
-            std::fprintf(md, "This exceeds the classical Hopfield limit of ~0.14N (= %zu),\n  confirming the benefit of the modern exponential energy function.\n",
-                         static_cast<size_t>(0.14f * static_cast<float>(N)));
+        if (hit_ceiling)
+        {
+            std::fprintf(md, "- **Capacity >= %zu patterns (ceiling reached).** The network showed perfect\n", capacity);
+            std::fprintf(md, "  recall at all tested counts. The true capacity is higher — increase\n");
+            std::fprintf(md, "  max_patterns to probe further.\n");
+        }
         else
-            std::fprintf(md, "This is at or below the classical 0.14N limit (= %zu). The sparse\n  hypercube connectivity may be limiting the exponential capacity advantage.\n",
-                         static_cast<size_t>(0.14f * static_cast<float>(N)));
+        {
+            std::fprintf(md, "- **Empirical capacity: %zu patterns.** ", capacity);
+            const float ratio = static_cast<float>(capacity) / static_cast<float>(N);
+            if (ratio > 0.14f)
+                std::fprintf(md, "This exceeds the classical Hopfield limit of ~0.14N (= %zu),\n  confirming the benefit of the modern exponential energy function.\n",
+                             static_cast<size_t>(0.14f * static_cast<float>(N)));
+            else
+                std::fprintf(md, "This is at or below the classical 0.14N limit (= %zu). The sparse\n  hypercube connectivity may be limiting the exponential capacity advantage.\n",
+                             static_cast<size_t>(0.14f * static_cast<float>(N)));
+        }
     }
 };

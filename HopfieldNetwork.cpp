@@ -6,13 +6,20 @@
 #include <limits>
 #include <numeric>
 
-// Explicit template instantiations for supported DIM values
+// Explicit template instantiations for supported DIM values (4-16)
+template class HopfieldNetwork<4>;
 template class HopfieldNetwork<5>;
 template class HopfieldNetwork<6>;
 template class HopfieldNetwork<7>;
 template class HopfieldNetwork<8>;
 template class HopfieldNetwork<9>;
 template class HopfieldNetwork<10>;
+template class HopfieldNetwork<11>;
+template class HopfieldNetwork<12>;
+template class HopfieldNetwork<13>;
+template class HopfieldNetwork<14>;
+template class HopfieldNetwork<15>;
+template class HopfieldNetwork<16>;
 
 // --- Construction and initialization ---
 

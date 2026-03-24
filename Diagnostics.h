@@ -10,11 +10,9 @@
 
 /// Run all diagnostics for a given DIM. Prints results to stdout and writes
 /// individual .md result files to diagnostics/.
-/// @param capacity_ceiling Max patterns for CapacityProbe (default 4*N is fast;
-///                         use e.g. 1000*N to find the true capacity ceiling).
 /// Returns true if all pass/fail checks passed.
 template <size_t DIM>
-bool RunDiagnostics(size_t capacity_ceiling = 4 * (1ULL << DIM))
+bool RunDiagnostics()
 {
     constexpr size_t N = 1ULL << DIM;
 
@@ -26,7 +24,7 @@ bool RunDiagnostics(size_t capacity_ceiling = 4 * (1ULL << DIM))
     bool all_pass = true;
     all_pass &= NoiseRecall<DIM>().RunAndPrint();
     all_pass &= EnergyMonotonicity<DIM>().RunAndPrint();
-    all_pass &= CapacityProbe<DIM>(capacity_ceiling).RunAndPrint();
+    all_pass &= CapacityProbe<DIM>().RunAndPrint();
     all_pass &= OverlapMetrics<DIM>().RunAndPrint();
     // all_pass &= ParameterSweep<DIM>().RunAndPrint();  // slow — uncomment to run
 
