@@ -26,20 +26,26 @@ class CapacityProbe
     static constexpr size_t N = 1ULL << DIM;
 
     /// Intelligent default ceiling scaled by DIM.
-    /// Cost per step ~ M * connections * N * samples * seeds.
-    /// Connections ~ N/2 at reach=DIM/2, so cost ~ M * N^2.
-    /// Calibrated so the full geometric probe completes in ~5 minutes.
+    /// Two cost factors limit the ceiling:
+    ///   1. Recall cost per step: O(M * connections * N) ~ O(M * N^2)
+    ///   2. Storage cost per step: O(M * N * threads) — OMP threads duplicate patterns
+    /// The ceiling is the minimum of limits from both factors.
+    /// Calibrated from DIM=8 where 65536 patterns completes in ~2 minutes.
     static constexpr size_t DefaultCeiling()
     {
-        // DIM=8 baseline: 64K patterns, N=256, cost factor = 256^2 = 65536
-        // For other DIMs: ceiling = 64K * 65536 / N^2, clamped to [64, 1M]
-        constexpr size_t baseline = 65536;          // 64K patterns at DIM=8
-        constexpr size_t base_n2 = 256ULL * 256;    // N^2 at DIM=8
-        constexpr size_t n2 = N * N;
-        constexpr size_t raw = baseline * base_n2 / n2;
-        // Clamp: at least 64 (meaningful probe), at most 4M (memory limit)
+        // Recall-limited ceiling: scales inversely with N^2
+        constexpr size_t recall_base = 65536;
+        constexpr size_t recall_n2 = 256ULL * 256;
+        constexpr size_t recall_limit = recall_base * recall_n2 / (N * N);
+
+        // Storage-limited ceiling: ~128MB per network copy, ~8 threads
+        // M * N * 4 bytes * 8 threads <= 1GB => M <= 1GB / (N * 32)
+        constexpr size_t storage_limit = (1024ULL * 1024 * 1024) / (N * 32);
+
+        constexpr size_t raw = recall_limit < storage_limit ? recall_limit : storage_limit;
+
         if (raw < 64) return 64;
-        if (raw > 1048576) return 1048576;
+        if (raw > 65536) return 65536;
         return raw;
     }
 
