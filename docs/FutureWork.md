@@ -1,63 +1,126 @@
-Sure. This is one of the more exciting developments in the Hopfield network literature in recent decades.
+# Future Work
 
-**The classical picture** uses a quadratic energy function — the energy is essentially E = -½ xᵀWx, where W is the weight matrix built from stored patterns via the Hebbian outer product rule. The quadratic energy landscape has broad, shallow basins, and as you store more patterns the basins start to overlap and interfere with each other. That interference is what gives you the ~0.138N capacity ceiling.
+## 1. Modern Hopfield Capacity on Sparse Topologies
 
-**The modern Hopfield insight** is to replace the quadratic energy with something much sharper. Ramsauer et al. (building on earlier work by Demircigil et al., 2017) use an energy function that involves a log-sum-exp over the stored patterns:
+### Background
 
-E = -log Σᵢ exp(ξᵢᵀ x) + terms
+Classical Hopfield networks with quadratic energy E = -1/2 x^T W x have a capacity
+ceiling of ~0.138N patterns due to cross-talk interference between stored patterns.
+Modern Hopfield networks (Ramsauer et al., 2021; Demircigil et al., 2017) replace
+this with a log-sum-exp energy:
 
-where ξᵢ are the stored patterns and x is the current state. The log-sum-exp is a smooth approximation to a max operation, and the key property is that it creates **exponentially deep and narrow basins** around each stored pattern. Because the basins are so sharp, patterns can be packed much more tightly without interfering.
+    E = -log sum_i exp(xi_i^T x) + terms
 
-**The capacity result** is that such a network can store on the order of **2^(N/2)** patterns — exponential in the number of neurons, rather than linear. This is a dramatic jump. For even modest N, this is an astronomically larger number of patterns than classical networks can handle.
+This creates exponentially deep, narrow basins around each pattern, yielding a
+theoretical capacity of O(2^(N/2)) — exponential in the number of neurons.
 
-**Why the sparse-vs-dense distinction fades:** In the classical regime, capacity is limited by cross-talk between patterns, and removing connections (sparsifying) worsens that cross-talk because each neuron gets a noisier estimate of the correct local field. But in the modern regime, the exponential sharpness of the energy landscape means the separation between basins is so large that you have enormous margin. Losing some connections still degrades things, but you're starting from such a high baseline that the network remains far more capable than any classical variant. The bottleneck is no longer interference — it's more about whether the update dynamics can still find the right basin, which is a less connectivity-sensitive problem.
+The exponential sharpness provides such large inter-basin margins that sparse
+connectivity (which degrades classical networks severely) becomes a secondary
+concern. The bottleneck shifts from interference to whether the update dynamics
+can find the correct basin — a less connectivity-sensitive problem.
 
-**The connection to attention in transformers** is what made this really take off. Ramsauer et al. showed that the retrieval update rule of the modern Hopfield network is mathematically equivalent to the attention mechanism: the softmax over key-query dot products in a transformer is doing exactly the same thing as one step of retrieval in this exponential Hopfield network. This gave a principled theoretical framework for understanding why attention works so well — it's performing pattern completion in an associative memory with exponential capacity.
+### Connection to Transformers
 
-**Some caveats worth noting:**
+Ramsauer et al. showed that the modern Hopfield retrieval rule is mathematically
+equivalent to the transformer attention mechanism: softmax over key-query dot
+products is one step of retrieval in an exponential Hopfield network. This provides
+a principled theoretical framework for understanding why attention works.
 
-The exponential capacity is a *theoretical* upper bound on the number of patterns that can be stored as fixed points. It assumes the patterns are in general position (not too correlated with each other). For highly structured or correlated pattern sets, the effective capacity can be much lower.
+### Open Questions for This Project
 
-The retrieval dynamics also matter. Having exponentially many fixed points doesn't mean you can always reliably converge to the right one from a noisy input. The basins of attraction, while well-separated, become extremely narrow as you approach capacity, so the tolerance for noise in the query shrinks.
+- **Empirical capacity vs. theory on the hypercube.** The theoretical 2^(N/2) bound
+  assumes patterns in general position. How does the dual-mask hypercube topology
+  (DIM nearest + reach shells) affect the empirical capacity? The CapacityProbe and
+  ParameterSweep diagnostics are designed to characterize this.
+- **Reach-beta interaction.** How does the optimal inverse temperature (beta) depend
+  on connectivity (reach)? Sparser networks may need lower beta to smooth noisy
+  local similarity signals.
+- **Continuous vs. binary states.** The exponential capacity result holds most cleanly
+  for continuous states. Our network uses binary (+1/-1) with sign activation.
+  Exploring continuous-state retrieval (removing the sign threshold) could unlock
+  higher capacity.
 
-There's also a continuous-state version versus a binary-state version, and the capacity results differ somewhat between them. The exponential result holds most cleanly in the continuous case, which is also the one that maps onto transformer attention.
+### Caveats
 
-**Demircigil et al. (2017)** deserve credit for establishing the exponential capacity result rigorously for networks with polynomial (rather than quadratic) interaction functions. Ramsauer et al. then extended this, connected it to transformers, and made it widely known in the machine learning community. Krotov and Hopfield (2016) also independently explored higher-order energy functions with similar capacity improvements.
+- Exponential capacity is a theoretical upper bound assuming patterns in general
+  position (not too correlated). Highly structured or correlated pattern sets will
+  have lower effective capacity.
+- As capacity is approached, basins of attraction become extremely narrow, reducing
+  noise tolerance in the query. The CapacityProbe diagnostic measures this tradeoff.
 
-So the trajectory is: quadratic energy → linear capacity → limited by interference → sparsity matters a lot. Exponential energy → exponential capacity → interference is negligible → sparsity is a secondary concern.
+---
 
+## 2. Reservoir Front-End for Pattern Decorrelation
 
-"The exponential capacity is a theoretical upper bound on the number of patterns that can be stored as fixed points. It assumes the patterns are in general position (not too correlated with each other). For highly structured or correlated pattern sets, the effective capacity can be much lower." - has anyone tried putting an RC reservoir (without the readout) between the inputs and the hopfield network to address this issue.  would it help?
+### Concept
 
+Use an untrained reservoir computing layer (without readout) as a nonlinear
+decorrelating front-end to the Hopfield network. The reservoir expands inputs into
+a high-dimensional dynamical state space, pushing correlated patterns closer to
+the general-position assumption required for exponential capacity.
 
-That's a really creative idea, and to my knowledge, **no one has done exactly that** — using a reservoir computing layer specifically as a decorrelating front-end to a modern Hopfield network to boost its effective capacity. But the reasoning behind it is sound, and there are adjacent threads in the literature worth pulling together.
+### Why It Should Help
 
-**Why it should help in principle:**
+- **Decorrelation.** A random recurrent reservoir acts as a nonlinear random
+  projection. Inputs that are close together in the original space get scattered
+  more widely in the reservoir state space due to nonlinear mixing.
+- **Dimensionality expansion.** If inputs are N-dimensional but the reservoir has
+  M >> N neurons, patterns are stored in a larger space where random vectors are
+  nearly orthogonal. Capacity could scale as 2^(M/2) instead of 2^(N/2).
 
-The core problem is that correlated input patterns reduce the effective capacity because the exponential separation between basins depends on the patterns being sufficiently different from each other (roughly orthogonal or in "general position"). A random recurrent reservoir, even without a trained readout, acts as a nonlinear random projection that expands the input into a high-dimensional dynamical state space. This has well-known decorrelating properties — inputs that are close together in the original space get scattered more widely across the reservoir's state space due to the nonlinear mixing. So feeding patterns through a reservoir before storing them in the Hopfield network should push correlated pattern sets closer to the general position assumption that the exponential capacity result requires.
+### Challenges
 
-**The dimensionality expansion also helps directly.** If your inputs are N-dimensional but your reservoir has M >> N neurons, you're now storing patterns in a much larger space where random vectors are nearly orthogonal with high probability. The exponential capacity scales with the dimension of the stored patterns, so going from N to M dimensions could give you 2^(M/2) instead of 2^(N/2) — a massive gain if M is substantially larger.
+- **Two-stage retrieval.** Stored patterns are reservoir states, but queries arrive
+  in input space. Queries must be run through the same reservoir dynamics before
+  Hopfield retrieval. This works if the reservoir is deterministic and the query
+  is a noisy version of a previously seen input.
+- **Sensitivity tradeoff.** Reservoir dynamics that decorrelate similar patterns
+  also amplify noise in corrupted queries, especially near the edge of chaos. There
+  is likely an optimal spectral radius regime that decorrelates patterns without
+  destroying basin-of-attraction structure.
+- **Chaos vs. stability.** The reservoir's spectral radius must be tuned to balance
+  decorrelation gain against retrieval robustness — an interesting parameter to
+  characterize.
 
-**Why it's not quite that simple:**
+### Related Work
 
-The reservoir introduces its own issues. First, **retrieval becomes a two-stage problem.** You store the reservoir states as patterns in the Hopfield network, but when you want to retrieve, your query is in the original input space. You need some way to map the query into reservoir space before the Hopfield network can do pattern completion. Without a readout layer (as you specified), you'd need to run the query through the same reservoir dynamics, which should work if the reservoir is deterministic and the query is a noisy version of a previously seen input. The reservoir would map it to a noisy version of the corresponding reservoir state, and then the Hopfield network cleans it up.
+- **Random projections for Hopfield networks.** Johnson-Lindenstrauss-type
+  embeddings preserve distances while improving orthogonality, but these are
+  static linear maps, not dynamical systems.
+- **Reservoir + attractor models.** Dominey et al. studied recurrent dynamics
+  feeding into associative memory in prefrontal cortex models, but focused on
+  sequence learning rather than capacity.
+- **Echo state separation property.** Jaeger's work on echo state networks
+  formally characterizes how different input histories produce different reservoir
+  states — closely related to decorrelation.
+- **Kernel methods and Hopfield networks.** Patterns are implicitly mapped to a
+  higher-dimensional feature space before storage. The reservoir acts as a
+  specific dynamical, temporal kernel.
 
-But here's the catch — **the reservoir's sensitivity to initial conditions cuts both ways.** The same nonlinear dynamics that decorrelate similar patterns also mean that small perturbations in the input can lead to quite different reservoir trajectories, especially if the reservoir is near the edge of chaos (which is where reservoirs are typically most computationally powerful). So the noise tolerance of the overall system might shrink: the reservoir amplifies both the useful differences between patterns *and* the noise in a corrupted query.
+### Research Direction
 
-There's likely an **optimal operating regime** where the reservoir's spectral radius is tuned to decorrelate patterns enough to help capacity without being so chaotic that it destroys the basin-of-attraction structure. That would be an interesting thing to characterize theoretically.
+The specific combination — an untrained random recurrent network as a fixed
+nonlinear front-end to a modern Hopfield network, analyzed for capacity scaling —
+appears to be novel. Key questions:
 
-**Adjacent work that's related:**
+1. How does effective capacity scale with reservoir size, spectral radius, and
+   input correlation structure?
+2. Is there a principled way to set reservoir hyperparameters to maximize capacity
+   gain while preserving retrieval robustness?
+3. Can random matrix theory (for the reservoir) be combined with existing capacity
+   proofs (for the Hopfield side) to derive analytical bounds?
 
-Random projections as preprocessing for Hopfield networks have been explored — this goes back to the idea that Johnson-Lindenstrauss-type embeddings preserve distances while making things more orthogonal. But these are typically static linear maps, not dynamical systems like reservoirs.
+This project's hypercube reservoir (from HypercubeReservoirComputer) is a natural
+candidate for the front-end, sharing the same substrate topology.
 
-Reservoir computing combined with attractor networks has been studied in the computational neuroscience literature, particularly by people like Peter Ford Dominey and others working on prefrontal cortex models where recurrent dynamics feed into associative memory systems. But the framing is usually about sequence learning rather than boosting pattern capacity.
+---
 
-The echo state network literature (Jaeger) has results on the separation property of reservoirs — the idea that different input histories produce different reservoir states — which is formally very close to what you'd want for decorrelation.
+## References
 
-There's also work on **kernel methods and Hopfield networks** where the patterns are implicitly mapped to a higher-dimensional feature space before storage. This is conceptually similar to what you're proposing, with the reservoir acting as a specific (dynamical, temporal) kernel.
-
-**What would be genuinely novel and interesting to investigate:**
-
-The specific combination you're describing — an untrained random recurrent network as a fixed nonlinear front-end to a modern Hopfield network, analyzed in terms of how it affects the capacity bound — hasn't been done as far as I know. The interesting theoretical questions would be: how does effective capacity scale with reservoir size, spectral radius, and input correlation structure? And is there a principled way to set the reservoir hyperparameters to maximize the capacity gain while preserving retrieval robustness?
-
-If you're thinking about actually pursuing this, it seems very publishable. The theory is tractable (random matrix theory for the reservoir, existing capacity proofs for the Hopfield side) and the numerical experiments would be straightforward.
+- Ramsauer, H., et al. (2021). "Hopfield Networks is All You Need." ICLR 2021.
+- Demircigil, M., et al. (2017). "On a model of associative memory with huge
+  storage capacity." Journal of Statistical Physics.
+- Krotov, D. & Hopfield, J. (2016). "Dense associative memory for pattern
+  recognition." NeurIPS 2016.
+- Amit, D., Gutfreund, H., & Sompolinsky, H. (1985). "Spin-glass models of
+  neural networks." Physical Review A.
