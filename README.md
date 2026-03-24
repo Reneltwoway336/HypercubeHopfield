@@ -1,30 +1,34 @@
 # HypercubeHopfield
 
-A Hopfield network built on a Boolean hypercube graph.
+A Modern Hopfield network built on a Boolean hypercube graph, achieving exponential
+memory capacity through softmax-attention retrieval on structured sparse connectivity.
 
 Licensed under the [Apache License 2.0](LICENSE).
 
-## What is a Hopfield Network?
+## What is a Modern Hopfield Network?
 
-A Hopfield network is a recurrent neural network that functions as content-addressable
-(associative) memory. It stores patterns as attractors of its energy landscape, and
-retrieves them by converging from noisy or partial cues to the nearest stored pattern.
+Classical Hopfield networks store patterns via Hebbian learning into a weight matrix
+and retrieve them by converging from noisy cues. Their capacity is limited to ~0.14N
+patterns due to cross-talk interference.
 
-The network consists of N binary neurons with symmetric connection weights. Given a
-set of patterns to memorize, the weights are set via Hebbian learning so that each
-pattern becomes a local energy minimum. Recall is performed by initializing the network
-with a corrupted cue and iterating the update rule until convergence.
+Modern Hopfield networks (Ramsauer et al., 2021) replace the quadratic energy function
+with a log-sum-exp (exponential) energy, and store patterns explicitly rather than
+collapsing them into weights. Retrieval uses softmax attention — mathematically
+equivalent to the transformer attention mechanism. This achieves exponential capacity
+in N, far exceeding the classical limit.
 
 ## What is HypercubeHopfield?
 
-HypercubeHopfield is a Hopfield network implementation where the connectivity is
-defined by a Boolean hypercube graph of dimension DIM, giving N = 2^DIM vertices
-(neurons). Each vertex's neighbors are computed by XOR operations on vertex indices --
-no adjacency list is stored, and neighbor lookup is a single instruction.
+HypercubeHopfield implements a Modern Hopfield network where the connectivity is
+defined by a Boolean hypercube of dimension DIM, giving N = 2^DIM vertices (neurons).
 
-The sparse hypercube topology replaces the traditional fully-connected Hopfield
-architecture with a structured sparse graph, trading storage capacity for
-computational efficiency and scalable memory.
+Each vertex connects to all neighbors within a **Hamming ball** of configurable radius.
+Neighbor lookup is a single XOR instruction — no adjacency list is stored. The mask
+table is sorted by Hamming distance (closest first) and optionally truncated by a
+`connectivity` parameter (0.0-1.0) for tunable sparsity.
+
+At DIM=8 (N=256) with default reach=DIM/2=4 (162 connections, 63% of vertices), the
+network stores 1000+ patterns with perfect recall in 2 sweeps.
 
 The system is designed for DIM 5-10 (32 to 1024 neurons).
 
@@ -45,21 +49,27 @@ GCC/Clang, and MSVC automatically.
 
 ```
 HypercubeHopfield/
-  HopfieldNetwork.h/cpp  Hypercube Hopfield network (N = 2^DIM vertices)
-  main.cpp               Entry point / benchmark suite
+  HopfieldNetwork.h/cpp    Modern Hopfield network (N = 2^DIM vertices)
+  Diagnostics.h            Runner for the diagnostics suite
+  main.cpp                 Entry point — runs all diagnostics
 
-  readout/               (reserved for readout/classification layers)
-
-  examples/              (example applications)
-
-  diagnostics/           (benchmark and analysis tools)
+  diagnostics/
+    DiagnosticHelpers.h    Shared utilities (pattern gen, corruption, overlap)
+    NoiseRecall.h          Single-pattern recall at varying noise levels
+    EnergyMonotonicity.h   Verify energy is non-increasing across sweeps
+    CapacityProbe.h        Find empirical capacity ceiling
+    OverlapMetrics.h       Per-pattern overlap and cross-interference
+    ParameterSweep.h       Sweep reach x beta for capacity characterization
+    *.md                   Auto-generated result files from each diagnostic
 
   docs/
-    HopfieldNetwork.md   Network architecture and parameters
+    HopfieldNetwork.md     Network architecture, connectivity, parameters
+    FutureWork.md          Research directions and open questions
 ```
 
 ## Documentation
 
 | Document | Covers |
 |----------|--------|
-| [docs/HopfieldNetwork.md](docs/HopfieldNetwork.md) | Hypercube graph, connectivity, update rule, learning rules, parameters |
+| [docs/HopfieldNetwork.md](docs/HopfieldNetwork.md) | Hypercube connectivity, Hamming-ball masks, update rule, energy function, parameters |
+| [docs/FutureWork.md](docs/FutureWork.md) | Capacity on sparse topologies, reservoir front-end for decorrelation |

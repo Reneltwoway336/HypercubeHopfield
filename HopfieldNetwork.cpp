@@ -1,6 +1,5 @@
 #include "HopfieldNetwork.h"
 
-#include <bit>
 #include <cassert>
 #include <cmath>
 #include <algorithm>
@@ -18,11 +17,12 @@ template class HopfieldNetwork<10>;
 // --- Construction and initialization ---
 
 template <size_t DIM>
-HopfieldNetwork<DIM>::HopfieldNetwork(uint64_t rng_seed, size_t reach, float beta)
-    : reach_(reach), beta_(beta), rng_(rng_seed)
+HopfieldNetwork<DIM>::HopfieldNetwork(uint64_t rng_seed, size_t reach, float beta, float connectivity)
+    : reach_(reach), beta_(beta), connectivity_(connectivity), rng_(rng_seed)
 {
     assert(reach_ >= 1 && reach_ <= DIM);
     assert(beta_ > 0.0f);
+    assert(connectivity_ > 0.0f && connectivity_ <= 1.0f);
     BuildMaskTable();
     Initialize();
 }
@@ -30,11 +30,26 @@ HopfieldNetwork<DIM>::HopfieldNetwork(uint64_t rng_seed, size_t reach, float bet
 template <size_t DIM>
 void HopfieldNetwork<DIM>::BuildMaskTable()
 {
+    // Collect all masks within the Hamming ball
     conn_masks_.clear();
     for (uint32_t m = 1; m < N; ++m)
     {
         if (static_cast<size_t>(std::popcount(m)) <= reach_)
             conn_masks_.push_back(m);
+    }
+
+    // Sort by Hamming distance (closest first), stable within same distance
+    std::stable_sort(conn_masks_.begin(), conn_masks_.end(),
+        [](uint32_t a, uint32_t b) {
+            return std::popcount(a) < std::popcount(b);
+        });
+
+    // Truncate to connectivity fraction
+    if (connectivity_ < 1.0f)
+    {
+        const size_t keep = std::max(size_t{1},
+            static_cast<size_t>(static_cast<float>(conn_masks_.size()) * connectivity_));
+        conn_masks_.resize(keep);
     }
 }
 

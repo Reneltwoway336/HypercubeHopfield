@@ -12,41 +12,48 @@ capacity in N, far exceeding the classical ~0.14N limit.
 
 ## Hypercube Connectivity
 
-Each vertex uses two complementary families of XOR masks for neighbor lookup,
-both computed inline with no adjacency storage:
+Each vertex connects to neighbors within a **Hamming ball** of radius `reach`.
+A vertex u is a neighbor of v if `popcount(v ^ u) <= reach`. The mask table is
+precomputed once at construction, sorted by Hamming distance (closest first),
+then optionally truncated by the `connectivity` parameter.
 
-### Nearest Neighbors (DIM connections)
+### Mask Table Construction
 
-Single-bit-flip masks: `NearestMask(i) = 1 << i` for i=0..DIM-1
+1. Enumerate all nonzero masks m < N with `popcount(m) <= reach`
+2. Sort by `popcount` (stable, so masks at same distance preserve order)
+3. Truncate to `floor(size * connectivity)` masks (minimum 1)
 
-    Masks: 1, 2, 4, 8, 16, 32, ...
+XOR with vertex index gives the neighbor: `nb = v ^ m`. No per-vertex adjacency
+storage — every vertex uses the same mask table.
 
-These are the standard hypercube edges — each flips exactly one bit, reaching
-all DIM vertices at Hamming distance 1. Provides full local coverage.
+### Connection Counts (full ball, connectivity=1.0)
 
-### Hamming Shells (reach connections)
+| DIM | N    | reach=DIM/2 | Connections | % of N |
+|-----|------|-------------|-------------|--------|
+| 5   | 32   | 2           | 15          | 47%    |
+| 6   | 64   | 3           | 41          | 64%    |
+| 7   | 128  | 3           | 63          | 49%    |
+| 8   | 256  | 4           | 162         | 63%    |
+| 9   | 512  | 4           | 255         | 50%    |
+| 10  | 1024 | 5           | 637         | 62%    |
 
-Cumulative-bit masks: `ShellMask(i) = (1 << (i+1)) - 1` for i=0..reach-1
+### Connectivity Tuning
 
-    Masks: 1, 3, 7, 15, 31, 63, ...
+The `connectivity` parameter (0.0-1.0) truncates the sorted mask table:
+- `connectivity=1.0`: full Hamming ball (max capacity, slowest)
+- `connectivity=0.5`: closest ~50% of neighbors (~2x faster)
+- `connectivity=0.1`: very sparse, fast, explores capacity-speed tradeoff
 
-Each mask flips the low (i+1) bits simultaneously, reaching a single vertex
-at Hamming distance (i+1). Provides long-range mixing across the hypercube.
-
-### Total Connectivity
-
-Each vertex has **DIM + reach** connections. Note that `NearestMask(0)` and
-`ShellMask(0)` both equal 1 (the same neighbor), matching the original
-reservoir topology from which this design is derived.
+Since masks are sorted by distance, truncation always keeps the closest
+neighbors and drops the most distant ones first.
 
 ## Update Rule (Modern Hopfield / Softmax Attention)
 
 Each vertex stores a binary spin s_v in {+1, -1}. The update at vertex v:
 
-1. **Local similarity** to each stored pattern mu through all neighbors:
+1. **Local similarity** to each stored pattern mu through Hamming-ball neighbors:
 
-       sim_mu(v) = sum_{nearest} pattern[mu][nb] * s_nb
-                 + sum_{shells}  pattern[mu][nb] * s_nb
+       sim_mu(v) = sum_{nb in ball(v)} pattern[mu][nb] * s_nb
 
 2. **Softmax attention** with inverse temperature beta:
 
@@ -79,26 +86,30 @@ Patterns are stored explicitly as full N-element arrays (not collapsed into
 a weight matrix). This enables:
 - Exponential capacity (up to exp(O(N)) patterns)
 - Exact pattern retrieval (no interference between stored patterns)
-- O(M * (DIM + reach)) per-vertex update cost, where M is the number of patterns
+- O(M * connections) per-vertex update cost, where M is the number of patterns
 
 ## Parameters
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| DIM       | Hypercube dimension (5-10) | Template parameter |
-| reach     | Number of Hamming shells per vertex (1-DIM) | 3 |
-| beta      | Inverse temperature for softmax attention | 4.0 |
-| rng_seed  | Random seed for update order | Required |
-| max_steps | Maximum recall sweeps | 100 |
+| Parameter    | Description                                      | Default  |
+|--------------|--------------------------------------------------|----------|
+| DIM          | Hypercube dimension (5-10)                       | Template |
+| reach        | Hamming-ball radius (1-DIM)                      | DIM/2    |
+| beta         | Inverse temperature for softmax attention        | 4.0      |
+| connectivity | Fraction of Hamming ball to use (0.0-1.0)        | 1.0      |
+| rng_seed     | Random seed for update order                     | Required |
+| max_steps    | Maximum recall sweeps                            | 100      |
 
 ## Capacity
 
 Modern Hopfield networks achieve exponential capacity in N — up to exp(O(N))
-patterns can be stored and retrieved reliably. On the hypercube topology,
-the effective capacity depends on the total connection count (DIM nearest +
-reach shells). Characterizing this tradeoff is a key goal of this project.
+patterns can be stored and retrieved reliably. At DIM=8 with reach=4 and
+connectivity=1.0 (162 connections, 63% of N=256), the network stores 1000+
+patterns with perfect recall. Characterizing how capacity degrades with
+reduced connectivity is a key goal of this project.
 
 ## References
 
 - Ramsauer, H., et al. (2021). "Hopfield Networks is All You Need." ICLR 2021.
+- Demircigil, M., et al. (2017). "On a model of associative memory with huge storage capacity."
+- Krotov, D. & Hopfield, J. (2016). "Dense associative memory for pattern recognition."
 - Amit, D., Gutfreund, H., & Sompolinsky, H. (1985). "Spin-glass models of neural networks."

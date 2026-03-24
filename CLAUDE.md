@@ -21,18 +21,26 @@ cmake --build cmake-build-release
 
 ## Architecture
 
-Hopfield associative memory network on a Boolean hypercube (2^DIM vertices, DIM 5-10).
-Each vertex stores a binary spin (+1/-1) and updates via the standard Hopfield rule
-using weighted connections derived from the hypercube topology. Neighbor lookup is
-a single XOR instruction — no adjacency storage. See `docs/HopfieldNetwork.md`.
+Modern Hopfield associative memory network (Ramsauer et al., 2021) on a Boolean
+hypercube (2^DIM vertices, DIM 5-10). Uses exponential energy with explicit pattern
+storage and softmax-attention retrieval for exponential memory capacity.
+
+Connectivity uses Hamming-ball neighbors: all vertices within Hamming distance `reach`
+of each vertex, sorted by distance and optionally truncated by `connectivity` (0.0-1.0).
+Neighbor lookup is a single XOR instruction — no adjacency storage.
+See `docs/HopfieldNetwork.md`.
 
 Key classes:
 - `HopfieldNetwork<DIM>` — network core (HopfieldNetwork.h/cpp)
+- `Diagnostics.h` — runner for the diagnostics suite
+- `diagnostics/*.h` — header-only diagnostic classes (NoiseRecall, EnergyMonotonicity, CapacityProbe, OverlapMetrics, ParameterSweep)
 
 ## Conventions
 
 - OpenMP is enabled for parallelism; CMakeLists.txt handles compiler-specific flags
 - Source files are collected via `file(GLOB)` — new .cpp files in project root are included automatically
+- Diagnostics are header-only template classes in `diagnostics/`, one per file
+- Each diagnostic writes results to `diagnostics/ClassName.md` on every run
 - Header guards use `#pragma once`
 - All values in the pipeline are float
 - Tests and diagnostics should be run in Release mode (-ffast-math can cause divergent results in Debug)

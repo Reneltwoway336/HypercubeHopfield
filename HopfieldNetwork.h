@@ -17,14 +17,16 @@
 /// softmax-weighted combination of stored patterns using local similarities
 /// through Hamming-ball neighbors, then applies sign activation.
 ///
-/// Connectivity: each vertex connects to all vertices within Hamming distance
-/// `reach` (the Hamming ball of radius `reach`). The number of connections per
-/// vertex is sum_{d=1}^{reach} C(DIM, d). For reach=DIM/2 this is roughly
-/// half the hypercube — rich enough for strong capacity while still sparse.
+/// Connectivity: each vertex connects to neighbors within Hamming distance
+/// `reach` (the Hamming ball of radius `reach`). The mask table is sorted by
+/// Hamming distance (closest first), then truncated to `connectivity` percent
+/// of the full ball. This gives a tunable sparsity knob:
+///   - connectivity=1.0: full Hamming ball (max capacity, slowest)
+///   - connectivity=0.5: half the connections, ~2x faster
+///   - connectivity=0.1: very sparse, fast, reduced capacity
 ///
-/// The neighbor mask table is precomputed once at construction: all nonzero
-/// masks m < N with popcount(m) <= reach. XOR with vertex index gives the
-/// neighbor: nb = v ^ m. No per-vertex adjacency storage.
+/// The neighbor mask table is precomputed once at construction. XOR with
+/// vertex index gives the neighbor: nb = v ^ m. No per-vertex adjacency storage.
 ///
 /// Call StorePattern() to add patterns (stored explicitly, not collapsed into
 /// weights), then Recall() to converge from a noisy or partial cue.
@@ -34,7 +36,6 @@ class HopfieldNetwork
     static_assert(DIM >= 5 && DIM <= 10, "DIM must be in 5 <= DIM <= 10");
 
     static constexpr size_t N = 1ULL << DIM;
-    static constexpr size_t MASK = N - 1;
 
 public:
     static constexpr size_t dim = DIM;
@@ -46,11 +47,15 @@ public:
     ///              Default DIM/2 gives ~50-63% connectivity.
     /// @param beta Inverse temperature for softmax attention. Higher values
     ///             give sharper retrieval (closer to winner-take-all).
+    /// @param connectivity Fraction of the Hamming ball to use (0.0-1.0).
+    ///                     Masks are sorted by distance (closest first) then
+    ///                     truncated. Default 1.0 uses the full ball.
     static std::unique_ptr<HopfieldNetwork> Create(uint64_t rng_seed,
                                                    size_t reach = DIM / 2,
-                                                   float beta = 4.0f)
+                                                   float beta = 4.0f,
+                                                   float connectivity = 1.0f)
     {
-        return std::unique_ptr<HopfieldNetwork>(new HopfieldNetwork(rng_seed, reach, beta));
+        return std::unique_ptr<HopfieldNetwork>(new HopfieldNetwork(rng_seed, reach, beta, connectivity));
     }
 
     HopfieldNetwork(const HopfieldNetwork&) = delete;
@@ -77,8 +82,11 @@ public:
     /// @brief Hamming-ball radius (max Hamming distance for neighbors).
     [[nodiscard]] size_t Reach() const { return reach_; }
 
-    /// @brief Number of connections per vertex (Hamming ball size).
+    /// @brief Number of connections per vertex (after connectivity truncation).
     [[nodiscard]] size_t NumConnections() const { return conn_masks_.size(); }
+
+    /// @brief Connectivity fraction (0.0-1.0).
+    [[nodiscard]] float Connectivity() const { return connectivity_; }
 
     /// @brief Inverse temperature parameter.
     [[nodiscard]] float Beta() const { return beta_; }
@@ -89,10 +97,11 @@ public:
     [[nodiscard]] const float* State() const { return vtx_state_; }
 
 private:
-    explicit HopfieldNetwork(uint64_t rng_seed, size_t reach, float beta);
+    explicit HopfieldNetwork(uint64_t rng_seed, size_t reach, float beta, float connectivity);
 
     size_t reach_;           // Hamming-ball radius (1..DIM)
     float beta_;             // inverse temperature for softmax attention
+    float connectivity_;     // fraction of Hamming ball used (0.0-1.0)
     size_t num_patterns_ = 0;
     std::mt19937_64 rng_;    // persists across Recall() calls for varied orderings
 
