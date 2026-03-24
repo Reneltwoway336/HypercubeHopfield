@@ -49,7 +49,7 @@ neighbors and drops the most distant ones first.
 
 ## Update Rule (Modern Hopfield / Softmax Attention)
 
-Each vertex stores a binary spin s_v in {+1, -1}. The update at vertex v:
+Each vertex stores a continuous-valued state s_v. The update at vertex v:
 
 1. **Local similarity** to each stored pattern mu through Hamming-ball neighbors:
 
@@ -59,10 +59,9 @@ Each vertex stores a binary spin s_v in {+1, -1}. The update at vertex v:
 
        alpha_mu = exp(beta * sim_mu) / sum_mu' exp(beta * sim_mu')
 
-3. **Weighted vote** of patterns at vertex v, with sign activation:
+3. **Weighted combination** of patterns at vertex v:
 
-       h_v = sum_mu alpha_mu * pattern[mu][v]
-       s_v <- sign(h_v)
+       s_v <- sum_mu alpha_mu * pattern[mu][v]
 
 The softmax concentrates attention on the pattern most similar to the
 local neighborhood, enabling sharp retrieval even with many stored patterns.
@@ -78,7 +77,8 @@ where sim_mu(v) is the local similarity defined above. This is the per-vertex
 averaged log-sum-exp of pattern similarities — the exponential interaction
 is what gives modern Hopfield networks their superior capacity.
 
-Convergence occurs when no vertex changes sign during a full sweep.
+Convergence occurs when no vertex changes by more than a float tolerance
+during a full sweep.
 
 ## Pattern Storage
 

@@ -89,7 +89,7 @@ private:
             std::fprintf(md, "## What is NoiseRecall?\n\n");
             std::fprintf(md, "Measures the network's ability to recover a stored pattern from a noisy cue.\n");
             std::fprintf(md, "A single pattern is stored, then corrupted at varying noise levels (percentage\n");
-            std::fprintf(md, "of bits flipped). The network runs Recall() and the overlap (normalized dot\n");
+            std::fprintf(md, "of elements negated). The network runs Recall() and the overlap (normalized dot\n");
             std::fprintf(md, "product) between the recalled state and the original is measured. An overlap\n");
             std::fprintf(md, "of 1.0 means perfect recall; 0.0 means uncorrelated.\n\n");
             std::fprintf(md, "---\n\n");

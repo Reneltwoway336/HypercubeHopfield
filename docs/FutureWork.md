@@ -35,10 +35,10 @@ a principled theoretical framework for understanding why attention works.
 - **Reach-beta interaction.** How does the optimal inverse temperature (beta) depend
   on connectivity (reach)? Sparser networks may need lower beta to smooth noisy
   local similarity signals.
-- **Continuous vs. binary states.** The exponential capacity result holds most cleanly
-  for continuous states. Our network uses binary (+1/-1) with sign activation.
-  Exploring continuous-state retrieval (removing the sign threshold) could unlock
-  higher capacity.
+- **Continuous-state capacity characterization.** The network now uses continuous-valued
+  states (no sign activation). The exponential capacity result holds most cleanly
+  in this regime. Characterizing how capacity scales with DIM, reach, and beta
+  in the continuous setting is an open empirical question.
 
 ### Caveats
 
