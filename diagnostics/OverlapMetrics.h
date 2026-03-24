@@ -112,7 +112,7 @@ private:
             std::fprintf(md, "For each stored pattern, we corrupt it at 20%% noise, recall, and compute:\n");
             std::fprintf(md, "- **Target overlap**: similarity to the intended pattern (should be ~1.0)\n");
             std::fprintf(md, "- **Max cross overlap**: highest similarity to any other stored pattern\n");
-            std::fprintf(md, "  (should be low — high values mean spurious attractor mixtures)\n\n");
+            std::fprintf(md, "  (should be low -- high values mean spurious attractor mixtures)\n\n");
             std::fprintf(md, "This diagnoses whether attractors are clean and well-separated, or whether\n");
             std::fprintf(md, "the network converges to spurious states that blend multiple patterns.\n\n");
             std::fprintf(md, "---\n\n");

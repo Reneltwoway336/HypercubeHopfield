@@ -172,12 +172,12 @@ private:
         if (!md) return;
         std::fprintf(md, "\n## Findings\n\n");
         std::fprintf(md, "- **Reach effect:** Higher Hamming-ball radius provides more neighbors for the\n");
-        std::fprintf(md, "  softmax attention, generally increasing capacity — but with diminishing\n");
+        std::fprintf(md, "  softmax attention, generally increasing capacity -- but with diminishing\n");
         std::fprintf(md, "  returns as the signal-to-noise ratio saturates.\n");
         std::fprintf(md, "- **Beta effect:** Higher beta sharpens retrieval (closer to winner-take-all),\n");
         std::fprintf(md, "  which typically improves capacity up to a point. Very high beta can cause\n");
         std::fprintf(md, "  instability if the local similarity signal is noisy.\n");
-        std::fprintf(md, "- **Interaction:** The optimal beta depends on reach — sparser connectivity\n");
+        std::fprintf(md, "- **Interaction:** The optimal beta depends on reach -- sparser connectivity\n");
         std::fprintf(md, "  (low reach) benefits from lower beta to smooth out the noisy local signal,\n");
         std::fprintf(md, "  while richer connectivity (high reach) can exploit higher beta.\n");
     }

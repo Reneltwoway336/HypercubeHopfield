@@ -180,7 +180,7 @@ public:
             threshold * 100.0f, prefix, capacity,
             100.0f * static_cast<float>(capacity) / static_cast<float>(N), N));
         if (hit_ceiling)
-            Tee(md, "(ceiling reached — increase max_patterns to probe higher)\n");
+            Tee(md, "(ceiling reached -- increase max_patterns to probe higher)\n");
         Tee(md, Fmt("Result: **%s**\n", capacity > 0 ? "PASS" : "FAIL"));
 
         WriteFindings(md, capacity, hit_ceiling);
@@ -227,7 +227,7 @@ private:
         if (hit_ceiling)
         {
             std::fprintf(md, "- **Capacity >= %zu patterns (ceiling reached).** The network showed perfect\n", capacity);
-            std::fprintf(md, "  recall at all tested counts. The true capacity is higher — increase\n");
+            std::fprintf(md, "  recall at all tested counts. The true capacity is higher -- increase\n");
             std::fprintf(md, "  max_patterns to probe further.\n");
         }
         else
