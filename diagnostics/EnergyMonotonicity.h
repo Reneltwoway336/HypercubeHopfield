@@ -53,12 +53,12 @@ public:
             float state[N];
             GenerateRandomPattern<N>(state, rng);
 
-            Tee(md, Fmt("\n### Seed %d\n\n", static_cast<int>(seed)));
-            Tee(md, "| Sweep |    Energy  |    Delta |  Result |\n");
-            Tee(md, "|-------|------------|----------|---------|\n");
+            Tee(md, Fmt("\n  Seed %d:\n", static_cast<int>(seed)));
+            Tee(md, "| Sweep |     Energy |    Delta | Result |\n");
+            Tee(md, "|-------|------------|----------|--------|\n");
 
             float prev_energy = net->Energy(state);
-            Tee(md, Fmt("|    0 | %10.4f |       -- |   -- |\n", prev_energy));
+            Tee(md, Fmt("| %5d | %10.4f |       -- |   --   |\n", 0, prev_energy));
 
             size_t stable_count = 0;
 
@@ -75,8 +75,8 @@ public:
                     ++total_violations;
                 }
 
-                const char* result = mono ? "  OK" : "FAIL";
-                Tee(md, Fmt("| %4d | %10.4f | %+8.5f | %s |\n",
+                const char* result = mono ? "  PASS  " : "  FAIL  ";
+                Tee(md, Fmt("| %5d | %10.4f | %+8.5f |%s|\n",
                     static_cast<int>(sweep), energy, delta, result));
 
                 if (std::fabs(delta) < 1e-6f)

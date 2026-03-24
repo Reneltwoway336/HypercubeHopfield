@@ -63,10 +63,10 @@ public:
             const bool level_pass = (thresholds[lvl] <= 0.0f) || (avg_overlap >= thresholds[lvl]);
             if (!level_pass) pass = false;
 
-            const char* result = (thresholds[lvl] <= 0.0f) ? "  --"
-                               : (level_pass ? "PASS" : "FAIL");
+            const char* result = (thresholds[lvl] <= 0.0f) ? "   --   "
+                               : (level_pass ? "  PASS  " : "  FAIL  ");
 
-            Tee(md, Fmt("| %4.0f%% | %.4f  | %5.1f  | %s |\n",
+            Tee(md, Fmt("| %4.0f%% | %7.4f | %6.1f |%s|\n",
                 noise_levels[lvl] * 100.0f, avg_overlap, avg_sweeps, result));
         }
 

@@ -81,23 +81,24 @@ public:
             const float mean_overlap = total_overlap / static_cast<float>(total_tests);
             const float avg_sweeps = total_sweeps / static_cast<float>(total_tests);
 
-            const char* status = (mean_overlap >= threshold) ? "  OK" : "DROP";
+            const char* status = (mean_overlap >= threshold) ? "  PASS  " : "  FAIL  ";
             if (mean_overlap >= threshold && !dropped)
                 capacity = count;
             else if (mean_overlap < threshold)
                 dropped = true;
 
-            Tee(md, Fmt("| %5d | %.4f  | %.4f  |  %5.1f  | %s |\n",
+            Tee(md, Fmt("| %5d | %9.4f | %8.4f | %6.1f |%s|\n",
                 static_cast<int>(count), mean_overlap, min_overlap, avg_sweeps, status));
 
             if (mean_overlap < 0.50f && count > 4)
                 break;
         }
 
-        Tee(md, Fmt("\nEstimated capacity (overlap >= %.0f%%): **%d patterns** (%.2f%% of N=%d)\n",
+        Tee(md, Fmt("\nCapacity (overlap >= %.0f%%): %d patterns (%.2f%% of N=%d)\n",
             threshold * 100.0f, static_cast<int>(capacity),
             100.0f * static_cast<float>(capacity) / static_cast<float>(N),
             static_cast<int>(N)));
+        Tee(md, Fmt("Result: **%s**\n", capacity > 0 ? "PASS" : "FAIL"));
 
         WriteFindings(md, capacity);
 

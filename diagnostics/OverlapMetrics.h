@@ -86,9 +86,9 @@ public:
             const bool row_pass = target_ok && cross_ok;
             if (!row_pass) pass = false;
 
-            Tee(md, Fmt("|   %d   | %.4f         | %+.4f            | %4.0f   | %s |\n",
+            Tee(md, Fmt("| %7d | %11.4f | %+14.4f | %6.1f | %s |\n",
                 static_cast<int>(p), avg_target, avg_cross,
-                avg_sweeps, row_pass ? "PASS" : "FAIL"));
+                avg_sweeps, row_pass ? " PASS " : " FAIL "));
         }
 
         Tee(md, Fmt("\nResult: **%s**\n", pass ? "PASS" : "FAIL"));
@@ -121,8 +121,8 @@ private:
             std::fprintf(md, "## Results\n\n");
         }
 
-        Tee(md, "| Pattern | Target Overlap | Max Cross Overlap | Sweeps | Result |\n");
-        Tee(md, "|---------|----------------|-------------------|--------|--------|\n");
+        Tee(md, "| Pattern | Target Ovlp | Max Cross Ovlp | Sweeps | Result |\n");
+        Tee(md, "|---------|-------------|----------------|--------|--------|\n");
     }
 
     static void WriteFindings(FILE* md, bool pass)

@@ -109,6 +109,7 @@ public:
 
         Tee(md, Fmt("\n(format: capacity / avg_sweeps | capacity = max patterns with overlap >= %.0f%%)\n",
             threshold * 100.0f));
+        Tee(md, "Result: **(informational)**\n");
 
         WriteFindings(md);
 
