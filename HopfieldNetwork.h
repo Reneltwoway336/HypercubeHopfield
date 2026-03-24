@@ -106,11 +106,14 @@ private:
     std::mt19937_64 rng_;    // persists across Recall() calls for varied orderings
 
     alignas(64) float vtx_state_[N]{};
-    std::vector<float> patterns_;    // flat [num_patterns_ * N], explicit pattern storage
+    std::vector<float> patterns_;    // row-major [num_patterns_ * N] for StorePattern
+    mutable std::vector<float> patterns_t_;  // col-major [N * num_patterns_] for fast Recall
+    mutable bool patterns_dirty_ = true;     // true when patterns_t_ needs rebuild
     std::vector<float> sim_buf_;     // reusable similarity buffer [num_patterns_]
     std::vector<uint32_t> conn_masks_;  // precomputed neighbor masks: popcount(m) <= reach_
 
     void Initialize();
     void BuildMaskTable();
+    void EnsureTransposed() const;
     void UpdateVertex(size_t v);
 };
