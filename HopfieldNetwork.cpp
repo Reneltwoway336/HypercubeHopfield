@@ -1,8 +1,9 @@
 #include "HopfieldNetwork.h"
 
+#include <cassert>
 #include <cmath>
-#include <cstring>
 #include <algorithm>
+#include <limits>
 #include <numeric>
 
 // Explicit template instantiations for supported DIM values
@@ -16,41 +17,122 @@ template class HopfieldNetwork<10>;
 // --- Construction and initialization ---
 
 template <size_t DIM>
-HopfieldNetwork<DIM>::HopfieldNetwork(uint64_t rng_seed)
-    : rng_seed_(rng_seed)
+HopfieldNetwork<DIM>::HopfieldNetwork(uint64_t rng_seed, size_t reach, float beta)
+    : reach_(reach), beta_(beta), rng_(rng_seed)
 {
+    assert(reach_ >= 1 && reach_ <= DIM);
+    assert(beta_ > 0.0f);
     Initialize();
 }
 
 template <size_t DIM>
 void HopfieldNetwork<DIM>::Initialize()
 {
-    vtx_weight_.assign(N * NUM_CONNECTIONS, 0.0f);
-    std::memset(vtx_state_, 0, sizeof(vtx_state_));
+    patterns_.clear();
+    sim_buf_.clear();
+    std::fill(vtx_state_, vtx_state_ + N, 1.0f);
     num_patterns_ = 0;
 }
 
-// --- Core operations (stubs) ---
+// --- Core operations ---
 
 template <size_t DIM>
-void HopfieldNetwork<DIM>::StorePattern(const float* /*pattern*/)
+void HopfieldNetwork<DIM>::StorePattern(const float* pattern)
 {
-    // TODO: Implement Hebbian learning on hypercube connections
+#ifndef NDEBUG
+    for (size_t i = 0; i < N; ++i)
+        assert(pattern[i] == 1.0f || pattern[i] == -1.0f);
+#endif
+    patterns_.insert(patterns_.end(), pattern, pattern + N);
     ++num_patterns_;
+    sim_buf_.resize(num_patterns_);
 }
 
 template <size_t DIM>
-size_t HopfieldNetwork<DIM>::Recall(float* /*state*/, size_t /*max_steps*/)
+size_t HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps)
 {
-    // TODO: Implement asynchronous update until convergence
-    return 0;
+    // Copy input state into internal buffer
+    std::copy(state, state + N, vtx_state_);
+
+    // Build a permutation array for random async updates
+    std::vector<size_t> perm(N);
+    std::iota(perm.begin(), perm.end(), 0);
+
+    for (size_t step = 0; step < max_steps; ++step)
+    {
+        std::shuffle(perm.begin(), perm.end(), rng_);
+        bool changed = false;
+
+        for (size_t idx = 0; idx < N; ++idx)
+        {
+            const size_t v = perm[idx];
+            const float old_spin = vtx_state_[v];
+            UpdateVertex(v);
+            if (vtx_state_[v] != old_spin)
+                changed = true;
+        }
+
+        if (!changed)
+        {
+            // Converged — copy result back
+            std::copy(vtx_state_, vtx_state_ + N, state);
+            return step + 1;
+        }
+    }
+
+    // Did not converge within max_steps
+    std::copy(vtx_state_, vtx_state_ + N, state);
+    return max_steps;
 }
 
 template <size_t DIM>
-float HopfieldNetwork<DIM>::Energy(const float* /*state*/) const
+float HopfieldNetwork<DIM>::Energy(const float* state) const
 {
-    // TODO: Compute Hopfield energy E = -0.5 * sum_ij w_ij s_i s_j
-    return 0.0f;
+    // Modern Hopfield energy: per-vertex log-sum-exp of pattern similarities.
+    // E(s) = -(1/N) * sum_v [ beta^-1 * log(sum_mu exp(beta * sim_mu(v))) ]
+    // where sim_mu(v) sums over nearest + shell neighbors of v.
+    if (num_patterns_ == 0) return 0.0f;
+
+    const float inv_beta = 1.0f / beta_;
+    float energy = 0.0f;
+
+    #pragma omp parallel reduction(+:energy)
+    {
+        std::vector<float> sim(num_patterns_);
+
+        #pragma omp for schedule(static)
+        for (size_t v = 0; v < N; ++v)
+        {
+            float max_sim = -std::numeric_limits<float>::max();
+
+            // Single pass: compute and store all similarities
+            for (size_t mu = 0; mu < num_patterns_; ++mu)
+            {
+                const float* p = patterns_.data() + mu * N;
+                float s = 0.0f;
+
+                // Nearest neighbors: single-bit-flip masks (standard hypercube edges)
+                for (size_t i = 0; i < DIM; ++i)
+                    s += p[v ^ NearestMask(i)] * state[v ^ NearestMask(i)];
+
+                // Hamming shells: cumulative-bit masks (long-range mixing)
+                for (size_t i = 0; i < reach_; ++i)
+                    s += p[v ^ ShellMask(i)] * state[v ^ ShellMask(i)];
+
+                sim[mu] = s;
+                if (s > max_sim) max_sim = s;
+            }
+
+            // Log-sum-exp with shift for numerical stability
+            float sum_exp = 0.0f;
+            for (size_t mu = 0; mu < num_patterns_; ++mu)
+                sum_exp += std::exp(beta_ * (sim[mu] - max_sim));
+
+            energy -= max_sim + inv_beta * std::log(sum_exp);
+        }
+    }
+
+    return energy / static_cast<float>(N);
 }
 
 template <size_t DIM>
@@ -60,7 +142,59 @@ void HopfieldNetwork<DIM>::Clear()
 }
 
 template <size_t DIM>
-void HopfieldNetwork<DIM>::UpdateVertex(size_t /*v*/)
+void HopfieldNetwork<DIM>::UpdateVertex(size_t v)
 {
-    // TODO: Compute local field h_v = sum_j w_vj s_j, update s_v = sign(h_v)
+    if (num_patterns_ == 0) return;
+
+    // Modern Hopfield update via softmax attention over stored patterns.
+    //
+    // 1. Compute local similarity to each pattern through dual-mask neighbors:
+    //      sim_mu = sum over nearest neighbors + Hamming shells
+    //
+    // 2. Apply softmax with inverse temperature beta:
+    //      alpha_mu = exp(beta * sim_mu) / sum_mu exp(beta * sim_mu)
+    //
+    // 3. New state is softmax-weighted vote of patterns at vertex v:
+    //      h_v = sum_mu alpha_mu * pattern[mu][v]
+    //      s_v = sign(h_v)
+
+    // --- Compute similarities (reuse member buffer) ---
+    float max_sim = -std::numeric_limits<float>::max();
+    float* sim = sim_buf_.data();
+
+    for (size_t mu = 0; mu < num_patterns_; ++mu)
+    {
+        const float* p = patterns_.data() + mu * N;
+        float s = 0.0f;
+
+        // Nearest neighbors: single-bit-flip masks (standard hypercube edges)
+        for (size_t i = 0; i < DIM; ++i)
+            s += p[v ^ NearestMask(i)] * vtx_state_[v ^ NearestMask(i)];
+
+        // Hamming shells: cumulative-bit masks (long-range mixing)
+        for (size_t i = 0; i < reach_; ++i)
+            s += p[v ^ ShellMask(i)] * vtx_state_[v ^ ShellMask(i)];
+
+        sim[mu] = s;
+        if (s > max_sim) max_sim = s;
+    }
+
+    // --- Softmax: exp(beta * (sim - max)) / sum ---
+    float sum_exp = 0.0f;
+    for (size_t mu = 0; mu < num_patterns_; ++mu)
+    {
+        sim[mu] = std::exp(beta_ * (sim[mu] - max_sim));
+        sum_exp += sim[mu];
+    }
+
+    // --- Weighted vote of patterns at vertex v ---
+    float h = 0.0f;
+    for (size_t mu = 0; mu < num_patterns_; ++mu)
+    {
+        const float* p = patterns_.data() + mu * N;
+        h += (sim[mu] / sum_exp) * p[v];
+    }
+
+    // Sign activation
+    vtx_state_[v] = (h >= 0.0f) ? 1.0f : -1.0f;
 }

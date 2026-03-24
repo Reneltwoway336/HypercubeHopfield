@@ -13,7 +13,7 @@ file(GLOB SOURCES
 
 add_executable(HypercubeHopfield ${SOURCES})
 
-target_include_directories(HypercubeHopfield PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/readout)
+target_include_directories(HypercubeHopfield PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/readout ${PROJECT_SOURCE_DIR}/diagnostics)
 
 # ——— Compiler-specific OpenMP handling ———
 if(MINGW)
@@ -33,15 +33,22 @@ elseif(MSVC)
 endif()
 
 # ——— Optimization and warning flags ———
-target_compile_options(HypercubeHopfield PRIVATE
-        $<$<CONFIG:Release>:
-        -O3 -march=native -mtune=native -ffast-math
-        >
-        $<$<CONFIG:Debug>:
-        -O0 -g
-        >
-        -Wall -Wextra -Wno-unknown-pragmas
-)
+if(MSVC)
+    target_compile_options(HypercubeHopfield PRIVATE
+            /W4
+            $<$<CONFIG:Release>:/O2 /fp:fast>
+    )
+else()
+    target_compile_options(HypercubeHopfield PRIVATE
+            $<$<CONFIG:Release>:
+            -O3 -march=native -mtune=native -ffast-math
+            >
+            $<$<CONFIG:Debug>:
+            -O0 -g
+            >
+            -Wall -Wextra -Wno-unknown-pragmas
+    )
+endif()
 
 # Optional: Static linking of libgcc/libstdc++ for easier distribution on Windows
 if(MINGW)
