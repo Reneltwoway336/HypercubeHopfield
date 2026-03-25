@@ -1,35 +1,33 @@
 #pragma once
 
-#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <vector>
 #include <random>
 
-/// Modern Hopfield network (Ramsauer et al., 2021) on a DIM-dimensional Boolean
-/// hypercube (N = 2^DIM vertices).
+/// Modern Hopfield associative memory on a Boolean hypercube.
 ///
-/// Uses an exponential energy function with explicit pattern storage and
-/// softmax-attention retrieval, achieving exponential memory capacity in N.
+/// Implements the exponential-energy Hopfield network of Ramsauer et al. (2021)
+/// on a DIM-dimensional hypercube with N = 2^DIM vertices. Patterns are stored
+/// explicitly (not collapsed into weights) and retrieved via softmax attention,
+/// giving exponential memory capacity in N.
 ///
-/// Each vertex stores a continuous-valued state. The update rule computes a
-/// softmax-weighted combination of stored patterns using local similarities
-/// through Hamming-ball neighbors.
+/// Architecture:
+///   - Each vertex holds a continuous-valued state in the range produced by
+///     softmax-weighted voting over stored patterns.
+///   - Neighbors are all vertices within Hamming distance `reach` (the Hamming
+///     ball). Neighbor lookup is a single XOR -- no adjacency storage required.
+///   - Asynchronous updates: each sweep visits every vertex in random order,
+///     replacing its state with the softmax-attention output over its neighbors.
+///   - Convergence is detected when no vertex changes by more than 1e-6 in a
+///     full sweep.
 ///
-/// Connectivity: each vertex connects to neighbors within Hamming distance
-/// `reach` (the Hamming ball of radius `reach`). The mask table is sorted by
-/// Hamming distance (closest first), then truncated to `connectivity` percent
-/// of the full ball. This gives a tunable sparsity knob:
-///   - connectivity=1.0: full Hamming ball (max capacity, slowest)
-///   - connectivity=0.5: half the connections, ~2x faster
-///   - connectivity=0.1: very sparse, fast, reduced capacity
-///
-/// The neighbor mask table is precomputed once at construction. XOR with
-/// vertex index gives the neighbor: nb = v ^ m. No per-vertex adjacency storage.
-///
-/// Call StorePattern() to add patterns (stored explicitly, not collapsed into
-/// weights), then Recall() to converge from a noisy or partial cue.
+/// Usage:
+///   auto net = HopfieldNetwork<8>::Create(seed);
+///   net->StorePattern(pattern1);
+///   net->StorePattern(pattern2);
+///   net->Recall(noisy_cue);  // noisy_cue converges to nearest stored pattern
 template <size_t DIM>
 class HopfieldNetwork
 {
@@ -68,7 +66,8 @@ public:
     /// @brief Run asynchronous updates until convergence or max_steps.
     /// @param state In/out: N-element state array (continuous-valued). Modified in place.
     /// @param max_steps Maximum update sweeps before declaring non-convergence.
-    /// @return Number of sweeps taken (< max_steps means converged).
+    /// @return 0 if no patterns stored (input unchanged), 1..max_steps-1 if
+    ///         converged, max_steps if not converged.
     size_t Recall(float* state, size_t max_steps = 100);
 
     /// @brief Compute modern Hopfield energy for the given state.
@@ -94,10 +93,12 @@ public:
     /// @brief Clear all stored patterns.
     void Clear();
 
+    /// @brief Pointer to the internal N-element vertex state array.
+    /// Valid after Recall(); reflects the converged (or last) state.
     [[nodiscard]] const float* State() const { return vtx_state_; }
 
 private:
-    explicit HopfieldNetwork(uint64_t rng_seed, size_t reach, float beta, float connectivity);
+    HopfieldNetwork(uint64_t rng_seed, size_t reach, float beta, float connectivity);
 
     size_t reach_;           // Hamming-ball radius (1..DIM)
     float beta_;             // inverse temperature for softmax attention
@@ -110,6 +111,7 @@ private:
     mutable std::vector<float> patterns_t_;  // col-major [N * num_patterns_] for fast Recall
     mutable bool patterns_dirty_ = true;     // true when patterns_t_ needs rebuild
     std::vector<float> sim_buf_;     // reusable similarity buffer [num_patterns_]
+    std::vector<size_t> perm_;       // reusable permutation array for Recall [N]
     std::vector<uint32_t> conn_masks_;  // precomputed neighbor masks: popcount(m) <= reach_
 
     void Initialize();

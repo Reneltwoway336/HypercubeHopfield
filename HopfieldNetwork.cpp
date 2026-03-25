@@ -1,9 +1,10 @@
 #include "HopfieldNetwork.h"
 
+#include <algorithm>
+#include <bit>
 #include <cassert>
 #include <cmath>
 #include <cstring>
-#include <algorithm>
 #include <limits>
 #include <numeric>
 
@@ -68,6 +69,8 @@ void HopfieldNetwork<DIM>::Initialize()
     patterns_t_.clear();
     patterns_dirty_ = true;
     sim_buf_.clear();
+    perm_.resize(N);
+    std::iota(perm_.begin(), perm_.end(), 0);
     std::memset(vtx_state_, 0, sizeof(vtx_state_));
     num_patterns_ = 0;
 }
@@ -102,23 +105,25 @@ void HopfieldNetwork<DIM>::StorePattern(const float* pattern)
 template <size_t DIM>
 size_t HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps)
 {
+    if (num_patterns_ == 0)
+    {
+        // Nothing to recall against -- return input unchanged.
+        return 0;
+    }
+
     EnsureTransposed();
 
     // Copy input state into internal buffer
     std::copy(state, state + N, vtx_state_);
 
-    // Build a permutation array for random async updates
-    std::vector<size_t> perm(N);
-    std::iota(perm.begin(), perm.end(), 0);
-
     for (size_t step = 0; step < max_steps; ++step)
     {
-        std::shuffle(perm.begin(), perm.end(), rng_);
+        std::shuffle(perm_.begin(), perm_.end(), rng_);
         bool changed = false;
 
         for (size_t idx = 0; idx < N; ++idx)
         {
-            const size_t v = perm[idx];
+            const size_t v = perm_[idx];
             const float old_val = vtx_state_[v];
             UpdateVertex(v);
             if (std::fabs(vtx_state_[v] - old_val) > 1e-6f)
@@ -127,7 +132,7 @@ size_t HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps)
 
         if (!changed)
         {
-            // Converged — copy result back
+            // Converged -- copy result back
             std::copy(vtx_state_, vtx_state_ + N, state);
             return step + 1;
         }
@@ -200,8 +205,6 @@ void HopfieldNetwork<DIM>::Clear()
 template <size_t DIM>
 void HopfieldNetwork<DIM>::UpdateVertex(size_t v)
 {
-    if (num_patterns_ == 0) return;
-
     // Modern Hopfield update via softmax attention over stored patterns.
     // Uses transposed pattern layout + connection-outer loop for cache efficiency.
     //
@@ -243,10 +246,11 @@ void HopfieldNetwork<DIM>::UpdateVertex(size_t v)
     }
 
     // Phase 3: weighted vote at vertex v using transposed layout
+    const float inv_sum = 1.0f / sum_exp;
     const float* pt_v = pt + v * M;
     float h = 0.0f;
     for (size_t mu = 0; mu < M; ++mu)
-        h += (sim[mu] / sum_exp) * pt_v[mu];
+        h += (sim[mu] * inv_sum) * pt_v[mu];
 
     vtx_state_[v] = h;
 }

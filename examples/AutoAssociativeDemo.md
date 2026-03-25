@@ -31,11 +31,11 @@ noise means more corruption.
 |   1.0 |            0.4506 |           1.0000 |      2 | RECOVERED |
 |   1.5 |            0.3124 |           1.0000 |      3 | RECOVERED |
 |   2.0 |            0.2662 |           1.0000 |      3 | RECOVERED |
-|   3.0 |            0.1666 |           1.0000 |      3 | RECOVERED |
+|   3.0 |            0.1666 |           0.0117 |      4 | FAILED    |
 |   5.0 |            0.0514 |           0.0397 |      3 | FAILED    |
 
-The network recovers perfectly up to noise = 3.0. At that level, the input
-similarity to the true profile is already very low (0.17) -- yet the attractor
+The network recovers perfectly up to noise = 2.0. At that level, the input
+similarity to the true profile is already very low (0.27) -- yet the attractor
 basin pulls it back completely. Beyond that threshold, the corrupted state lands
 in the wrong basin and converges to a different attractor.
 
@@ -67,6 +67,6 @@ sufficient for complete reconstruction, as long as the input falls within the
 correct attractor basin.
 
 With 20 stored profiles on a 256-vertex hypercube, the network tolerates extreme
-corruption (noise sigma up to 3.0, well beyond the [-1, 1] signal amplitude) and
+corruption (noise sigma up to 2.0, twice the [-1, 1] signal amplitude) and
 extreme data loss (90% of sensors dead) while still recovering the original
 profile in 2-3 sweeps.
