@@ -6,12 +6,13 @@
 #include <vector>
 #include <random>
 
-/// Modern Hopfield associative memory on a Boolean hypercube.
+/// Modern Hopfield associative memory on a hypercube graph.
 ///
 /// Implements the exponential-energy Hopfield network of Ramsauer et al. (2021)
-/// on a DIM-dimensional hypercube with N = 2^DIM vertices. Patterns are stored
-/// explicitly (not collapsed into weights) and retrieved via softmax attention,
-/// giving exponential memory capacity in N.
+/// on a DIM-dimensional hypercube with N = 2^DIM vertices. Vertices are
+/// addressed by DIM-bit binary strings; each vertex holds a continuous-valued
+/// state. Patterns are stored explicitly (not collapsed into weights) and
+/// retrieved via softmax attention, giving exponential memory capacity in N.
 ///
 /// Architecture:
 ///   - Each vertex holds a continuous-valued state in the range produced by

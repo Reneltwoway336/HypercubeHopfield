@@ -3,8 +3,9 @@
 ## Overview
 
 The `HopfieldNetwork<DIM>` implements a **sparse local-attention variant** of the
-Modern Hopfield network (Ramsauer et al., 2021) on a DIM-dimensional Boolean
-hypercube with N = 2^DIM vertices (neurons).
+Modern Hopfield network (Ramsauer et al., 2021) on a DIM-dimensional hypercube
+graph with N = 2^DIM vertices (neurons). Vertices are addressed by DIM-bit
+binary strings; each holds a continuous-valued state.
 
 Unlike classical Hopfield networks that collapse patterns into a weight matrix via
 Hebbian learning, the modern formulation stores patterns explicitly and uses
@@ -19,8 +20,8 @@ capacity of O(2^(N/2)).
 
 This implementation uses **sparse local attention**: each vertex computes similarity
 using only its Hamming-ball neighbors (a subset of N), and vertices update
-asynchronously. This is a deliberate design choice — sparse connectivity trades
-some theoretical capacity for O(M × connections) per-vertex cost instead of O(M × N),
+asynchronously. This is a deliberate design choice -- sparse connectivity trades
+some theoretical capacity for O(M * connections) per-vertex cost instead of O(M * N),
 enabling much larger networks. Empirically, the capacity is still far above the
 classical ~0.14N limit and scales super-linearly with DIM.
 
@@ -38,7 +39,7 @@ then optionally truncated by the `connectivity` parameter.
 3. Truncate to `floor(size * connectivity)` masks (minimum 1)
 
 XOR with vertex index gives the neighbor: `nb = v ^ m`. No per-vertex adjacency
-storage — every vertex uses the same mask table.
+storage -- every vertex uses the same mask table.
 
 ### Connection Counts (full ball, connectivity=1.0)
 
@@ -88,7 +89,7 @@ Updates are asynchronous (one vertex at a time, random order).
     E(s) = -(1/N) * sum_v [ beta^-1 * log(sum_mu exp(beta * sim_mu(v))) ]
 
 where sim_mu(v) is the local similarity defined above. This is the per-vertex
-averaged log-sum-exp of pattern similarities — the exponential interaction
+averaged log-sum-exp of pattern similarities -- the exponential interaction
 is what gives modern Hopfield networks their superior capacity.
 
 Convergence occurs when no vertex changes by more than a float tolerance
@@ -124,11 +125,9 @@ super-linearly with DIM:
 |-----|------|-------------|-----------|
 | 6   | 64   | 41          | 512       |
 | 7   | 128  | 63          | 32768     |
-| 8   | 256  | 162         | >= 65536  |
+| 8   | 256  | 162         | 65536+    |
 
 At DIM=8, the network stores at least 256x its vertex count with perfect recall.
-Characterizing how capacity scales with connectivity and reach is a key goal
-of this project.
 
 ## References
 

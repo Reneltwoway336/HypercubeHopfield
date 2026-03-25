@@ -1,4 +1,4 @@
-#include "Diagnostics.h"
+#include "diagnostics/Diagnostics.h"
 
 int main()
 {

@@ -48,27 +48,28 @@ public:
             std::mt19937_64 rng(seed + 4000);
             auto net = HopfieldNetwork<DIM>::Create(rng());
 
-            float patterns[num_patterns][N];
+            std::vector<float> patterns(num_patterns * N);
             for (size_t p = 0; p < num_patterns; ++p)
             {
-                GenerateRandomPattern<N>(patterns[p], rng);
-                net->StorePattern(patterns[p]);
+                GenerateRandomPattern<N>(patterns.data() + p * N, rng);
+                net->StorePattern(patterns.data() + p * N);
             }
 
-            float noisy[N];
+            std::vector<float> noisy(N);
             for (size_t p = 0; p < num_patterns; ++p)
             {
-                CorruptPattern<N>(patterns[p], noisy, noise, rng);
+                const float* orig = patterns.data() + p * N;
+                CorruptPattern<N>(orig, noisy.data(), noise, rng);
 
-                const size_t sweeps = net->Recall(noisy, 100);
-                total_target[p] += ComputeOverlap<N>(patterns[p], noisy);
+                const size_t sweeps = net->Recall(noisy.data(), 100);
+                total_target[p] += ComputeOverlap<N>(orig, noisy.data());
                 total_sweeps[p] += static_cast<float>(sweeps);
 
                 float max_cross = -2.0f;
                 for (size_t q = 0; q < num_patterns; ++q)
                 {
                     if (q == p) continue;
-                    const float cross = ComputeOverlap<N>(patterns[q], noisy);
+                    const float cross = ComputeOverlap<N>(patterns.data() + q * N, noisy.data());
                     if (cross > max_cross) max_cross = cross;
                 }
                 total_cross[p] += max_cross;
@@ -102,7 +103,7 @@ public:
 private:
     static void PrintHeader(FILE* md)
     {
-        std::printf("\n--- [4/5] OverlapMetrics ---\n");
+        std::printf("\n--- [4/4] OverlapMetrics ---\n");
 
         if (md)
         {

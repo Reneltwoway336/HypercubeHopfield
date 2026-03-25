@@ -1,10 +1,9 @@
 #pragma once
 
-#include "diagnostics/NoiseRecall.h"
-#include "diagnostics/EnergyMonotonicity.h"
-#include "diagnostics/CapacityProbe.h"
-#include "diagnostics/OverlapMetrics.h"
-#include "diagnostics/ParameterSweep.h"
+#include "NoiseRecall.h"
+#include "EnergyMonotonicity.h"
+#include "CapacityProbe.h"
+#include "OverlapMetrics.h"
 
 #include <cstdio>
 
@@ -26,7 +25,6 @@ bool RunDiagnostics()
     all_pass &= EnergyMonotonicity<DIM>().RunAndPrint();
     all_pass &= CapacityProbe<DIM>().RunAndPrint();
     all_pass &= OverlapMetrics<DIM>().RunAndPrint();
-    // all_pass &= ParameterSweep<DIM>().RunAndPrint();  // slow — uncomment to run
 
     std::printf("\n============================================================\n");
     std::printf("  OVERALL: %s\n", all_pass ? "ALL PASSED" : "SOME TESTS FAILED");

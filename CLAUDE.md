@@ -21,9 +21,10 @@ cmake --build cmake-build-release
 
 ## Architecture
 
-Modern Hopfield associative memory network (Ramsauer et al., 2021) on a Boolean
-hypercube (2^DIM vertices, DIM 4-16). Uses exponential energy with explicit pattern
-storage and softmax-attention retrieval for exponential memory capacity.
+Modern Hopfield associative memory (Ramsauer et al., 2021) on a hypercube graph
+(2^DIM vertices, DIM 4-16). Vertices are addressed by DIM-bit binary strings;
+each holds a continuous-valued state. Uses exponential energy with explicit
+pattern storage and softmax-attention retrieval for exponential memory capacity.
 
 Connectivity uses Hamming-ball neighbors: all vertices within Hamming distance `reach`
 of each vertex, sorted by distance and optionally truncated by `connectivity` (0.0-1.0).
@@ -32,8 +33,8 @@ See `docs/HopfieldNetwork.md`.
 
 Key classes:
 - `HopfieldNetwork<DIM>` — network core (HopfieldNetwork.h/cpp)
-- `Diagnostics.h` — runner for the diagnostics suite
-- `diagnostics/*.h` — header-only diagnostic classes (NoiseRecall, EnergyMonotonicity, CapacityProbe, OverlapMetrics, ParameterSweep)
+- `diagnostics/Diagnostics.h` — runner for the diagnostics suite
+- `diagnostics/*.h` — header-only diagnostic classes (NoiseRecall, EnergyMonotonicity, CapacityProbe, OverlapMetrics)
 
 ## Conventions
 

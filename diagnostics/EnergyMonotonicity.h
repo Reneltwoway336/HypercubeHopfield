@@ -42,30 +42,30 @@ public:
             auto net = HopfieldNetwork<DIM>::Create(rng());
 
             // Store 3 patterns
-            float pattern[N];
+            std::vector<float> pattern(N);
             for (int p = 0; p < 3; ++p)
             {
-                GenerateRandomPattern<N>(pattern, rng);
-                net->StorePattern(pattern);
+                GenerateRandomPattern<N>(pattern.data(), rng);
+                net->StorePattern(pattern.data());
             }
 
             // Start from random state
-            float state[N];
-            GenerateRandomPattern<N>(state, rng);
+            std::vector<float> state(N);
+            GenerateRandomPattern<N>(state.data(), rng);
 
-            Tee(md, Fmt("\n  Seed %d:\n", static_cast<int>(seed)));
+            Tee(md, Fmt("\n### Seed %d\n\n", static_cast<int>(seed)));
             Tee(md, "| Sweep |     Energy |    Delta | Result |\n");
             Tee(md, "|-------|------------|----------|--------|\n");
 
-            float prev_energy = net->Energy(state);
+            float prev_energy = net->Energy(state.data());
             Tee(md, Fmt("| %5d | %10.4f |       -- |   --   |\n", 0, prev_energy));
 
             size_t stable_count = 0;
 
             for (size_t sweep = 1; sweep <= max_sweeps; ++sweep)
             {
-                net->Recall(state, 1);
-                const float energy = net->Energy(state);
+                net->Recall(state.data(), 1);  // single sweep
+                const float energy = net->Energy(state.data());
                 const float delta = energy - prev_energy;
 
                 const bool mono = (delta <= epsilon);
@@ -109,7 +109,7 @@ public:
 private:
     static void PrintHeader(FILE* md)
     {
-        std::printf("\n--- [2/5] EnergyMonotonicity ---\n");
+        std::printf("\n--- [2/4] EnergyMonotonicity ---\n");
 
         if (md)
         {

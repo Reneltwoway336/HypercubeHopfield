@@ -28,7 +28,7 @@ class CapacityProbe
     /// Intelligent default ceiling scaled by DIM.
     /// Two cost factors limit the ceiling:
     ///   1. Recall cost per step: O(M * connections * N) ~ O(M * N^2)
-    ///   2. Storage cost per step: O(M * N * threads) — OMP threads duplicate patterns
+    ///   2. Storage cost per step: O(M * N * threads) -- OMP threads duplicate patterns
     /// The ceiling is the minimum of limits from both factors.
     /// Calibrated from DIM=8 where 65536 patterns completes in ~2 minutes.
     static constexpr size_t DefaultCeiling()
@@ -120,7 +120,7 @@ public:
                     for (size_t p = 0; p < count; ++p)
                         thread_net->StorePattern(patterns.data() + p * N);
 
-                    float noisy[N];
+                    std::vector<float> noisy(N);
 
                     #pragma omp for schedule(dynamic)
                     for (size_t ti = 0; ti < test_count; ++ti)
@@ -130,10 +130,10 @@ public:
 
                         // Each thread needs its own RNG for corruption
                         std::mt19937_64 thread_rng(seed * 10000 + count * 100 + p);
-                        CorruptPattern<N>(orig, noisy, noise, thread_rng);
+                        CorruptPattern<N>(orig, noisy.data(), noise, thread_rng);
 
-                        const size_t sweeps = thread_net->Recall(noisy, 100);
-                        const float overlap = ComputeOverlap<N>(orig, noisy);
+                        const size_t sweeps = thread_net->Recall(noisy.data(), 100);
+                        const float overlap = ComputeOverlap<N>(orig, noisy.data());
                         par_overlap += overlap;
                         par_sweeps += static_cast<float>(sweeps);
                         if (overlap < par_min_ovlp) par_min_ovlp = overlap;
@@ -175,9 +175,9 @@ public:
         }
 
         const bool hit_ceiling = !dropped && (capacity == counts.back());
-        const char* prefix = hit_ceiling ? ">= " : "";
-        Tee(md, Fmt("\nCapacity (overlap >= %.0f%%): %s%zu patterns (%.2f%% of N=%zu)\n",
-            threshold * 100.0f, prefix, capacity,
+        const char* suffix = hit_ceiling ? "+" : "";
+        Tee(md, Fmt("\nCapacity (overlap >= %.0f%%): %zu%s patterns (%.2f%% of N=%zu)\n",
+            threshold * 100.0f, capacity, suffix,
             100.0f * static_cast<float>(capacity) / static_cast<float>(N), N));
         if (hit_ceiling)
             Tee(md, "(ceiling reached -- increase max_patterns to probe higher)\n");
@@ -195,7 +195,7 @@ private:
 
     static void PrintHeader(FILE* md, size_t max_patterns, size_t max_samples)
     {
-        std::printf("\n--- [3/5] CapacityProbe (ceiling=%zu) ---\n", max_patterns);
+        std::printf("\n--- [3/4] CapacityProbe (ceiling=%zu) ---\n", max_patterns);
 
         if (md)
         {
@@ -226,7 +226,7 @@ private:
         std::fprintf(md, "\n## Findings\n\n");
         if (hit_ceiling)
         {
-            std::fprintf(md, "- **Capacity >= %zu patterns (ceiling reached).** The network showed perfect\n", capacity);
+            std::fprintf(md, "- **Capacity: %zu+ patterns (ceiling reached).** The network showed perfect\n", capacity);
             std::fprintf(md, "  recall at all tested counts. The true capacity is higher -- increase\n");
             std::fprintf(md, "  max_patterns to probe further.\n");
         }

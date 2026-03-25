@@ -10,9 +10,10 @@
 /// Stores one continuous-valued pattern, corrupts it with Gaussian noise at
 /// increasing stddev (0.1-0.5), recalls, and measures cosine similarity with
 /// the original. Averaged over 3 seeds. Tests that the network can reliably
-/// recover from noise — the fundamental Hopfield operation.
+/// recover from noise -- the fundamental Hopfield operation.
 ///
-/// Pass criteria: cosine similarity >= 0.95 at 0.1 noise, >= 0.90 at 0.2, >= 0.80 at 0.3.
+/// Pass criteria: cosine similarity >= 0.95 at 0.1, >= 0.90 at 0.2, >= 0.80
+/// at 0.3. Noise levels 0.4 and 0.5 are reported but have no pass threshold.
 template <size_t DIM>
 class NoiseRecall
 {
@@ -25,7 +26,7 @@ public:
     {
         constexpr float noise_levels[] = {0.10f, 0.20f, 0.30f, 0.40f, 0.50f};
         constexpr float thresholds[]   = {0.95f, 0.90f, 0.80f, 0.0f,  0.0f};
-        constexpr size_t num_levels = sizeof(noise_levels) / sizeof(noise_levels[0]);
+        constexpr size_t num_levels = std::size(noise_levels);
 
         FILE* md = std::fopen("diagnostics/NoiseRecall.md", "w");
         if (!md)
@@ -47,15 +48,15 @@ public:
                 std::mt19937_64 rng(seed + lvl * 1000);
                 auto net = HopfieldNetwork<DIM>::Create(rng());
 
-                float pattern[N];
-                GenerateRandomPattern<N>(pattern, rng);
-                net->StorePattern(pattern);
+                std::vector<float> pattern(N);
+                GenerateRandomPattern<N>(pattern.data(), rng);
+                net->StorePattern(pattern.data());
 
-                float noisy[N];
-                CorruptPattern<N>(pattern, noisy, noise_levels[lvl], rng);
+                std::vector<float> noisy(N);
+                CorruptPattern<N>(pattern.data(), noisy.data(), noise_levels[lvl], rng);
 
-                const size_t sweeps = net->Recall(noisy, 100);
-                total_overlap += ComputeOverlap<N>(pattern, noisy);
+                const size_t sweeps = net->Recall(noisy.data(), 100);
+                total_overlap += ComputeOverlap<N>(pattern.data(), noisy.data());
                 total_sweeps += static_cast<float>(sweeps);
             }
 
@@ -82,7 +83,7 @@ public:
 private:
     static void PrintHeader(FILE* md)
     {
-        std::printf("\n--- [1/5] NoiseRecall ---\n");
+        std::printf("\n--- [1/4] NoiseRecall ---\n");
 
         if (md)
         {
