@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)  # Prefer -std=c++23 over GNU extensions
 
-# Source collection via GLOB — new .cpp files in project root are picked up automatically
+# Source collection via GLOB -- new .cpp files in project root are picked up automatically
 file(GLOB SOURCES
         ${PROJECT_SOURCE_DIR}/*.cpp
 )
@@ -14,7 +14,7 @@ add_executable(HypercubeHopfield ${SOURCES})
 
 target_include_directories(HypercubeHopfield PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/diagnostics)
 
-# ——— Compiler-specific OpenMP handling ———
+# --- Compiler-specific OpenMP handling ---
 if(MINGW)
     # MinGW requires -fopenmp for both compilation and linking to enable libgomp
     target_compile_options(HypercubeHopfield PRIVATE -fopenmp)
@@ -31,7 +31,7 @@ elseif(MSVC)
     target_compile_options(HypercubeHopfield PRIVATE /openmp)
 endif()
 
-# ——— Optimization and warning flags ———
+# --- Optimization and warning flags ---
 if(MSVC)
     target_compile_options(HypercubeHopfield PRIVATE
             /W4
@@ -54,7 +54,7 @@ if(MINGW)
     target_link_options(HypercubeHopfield PRIVATE -static-libgcc -static-libstdc++)
 endif()
 
-# ——— Examples ———
+# --- Examples ---
 # Each example is a standalone executable with its own main().
 # They link against the same HopfieldNetwork.cpp as the main target.
 

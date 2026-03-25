@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 David Liptak
+
 /// Heteroassociative memory demo: diagnostic lookup.
 ///
 /// An industrial system maps sensor readings to diagnostic responses by

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 David Liptak
+
 /// Autoassociative memory demo: sensor fault recovery.
 ///
 /// A facility's sensor array stores known-good profiles. When sensors
