@@ -55,7 +55,37 @@ if(MINGW)
 endif()
 
 # ——— Examples ———
-# (uncomment as examples are added)
-# add_executable(PatternRecall examples/PatternRecall.cpp ${PROJECT_SOURCE_DIR}/HopfieldNetwork.cpp)
-# target_include_directories(PatternRecall PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/diagnostics)
-# target_compile_options(PatternRecall PRIVATE $<$<CONFIG:Release>:-O3 -march=native -ffast-math> -Wall -Wextra -Wno-unknown-pragmas)
+# Each example is a standalone executable with its own main().
+# They link against the same HopfieldNetwork.cpp as the main target.
+
+set(EXAMPLE_COMMON_SOURCES ${PROJECT_SOURCE_DIR}/HopfieldNetwork.cpp)
+
+file(GLOB EXAMPLE_SOURCES ${PROJECT_SOURCE_DIR}/examples/*.cpp)
+
+foreach(EXAMPLE_SRC ${EXAMPLE_SOURCES})
+    get_filename_component(EXAMPLE_NAME ${EXAMPLE_SRC} NAME_WE)
+    add_executable(${EXAMPLE_NAME} ${EXAMPLE_SRC} ${EXAMPLE_COMMON_SOURCES})
+    target_include_directories(${EXAMPLE_NAME} PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/diagnostics)
+
+    if(MINGW)
+        target_compile_options(${EXAMPLE_NAME} PRIVATE -fopenmp)
+        target_link_options(${EXAMPLE_NAME} PRIVATE -fopenmp -static-libgcc -static-libstdc++)
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU" AND NOT MINGW)
+        find_package(OpenMP QUIET)
+        if(OpenMP_CXX_FOUND)
+            target_link_libraries(${EXAMPLE_NAME} OpenMP::OpenMP_CXX)
+        endif()
+    elseif(MSVC)
+        target_compile_options(${EXAMPLE_NAME} PRIVATE /openmp)
+    endif()
+
+    if(MSVC)
+        target_compile_options(${EXAMPLE_NAME} PRIVATE /W4 $<$<CONFIG:Release>:/O2 /fp:fast>)
+    else()
+        target_compile_options(${EXAMPLE_NAME} PRIVATE
+            $<$<CONFIG:Release>:-O3 -march=native -mtune=native -ffast-math>
+            $<$<CONFIG:Debug>:-O0 -g>
+            -Wall -Wextra -Wno-unknown-pragmas
+        )
+    endif()
+endforeach()
