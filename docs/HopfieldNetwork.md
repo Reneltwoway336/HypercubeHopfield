@@ -19,11 +19,11 @@ the entire state vector is updated synchronously. This gives theoretical exponen
 capacity of O(2^(N/2)).
 
 This implementation uses **sparse local attention**: each vertex computes similarity
-using only its Hamming-ball neighbors (a subset of N), and vertices update
-asynchronously. This is a deliberate design choice -- sparse connectivity trades
-some theoretical capacity for O(M * connections) per-vertex cost instead of O(M * N),
-enabling much larger networks. Empirically, the capacity is still far above the
-classical ~0.14N limit and scales super-linearly with DIM.
+using only its Hamming-ball neighbors (a subset of N). This is a deliberate design
+choice -- sparse connectivity trades some theoretical capacity for
+O(M * connections) per-vertex cost instead of O(M * N), enabling much larger
+networks. Empirically, the capacity is still far above the classical ~0.14N limit
+and scales super-linearly with DIM.
 
 ## Hypercube Connectivity
 

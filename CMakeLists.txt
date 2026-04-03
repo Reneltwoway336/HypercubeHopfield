@@ -18,7 +18,7 @@ set(PUBLIC_HEADERS ${PROJECT_SOURCE_DIR}/HopfieldNetwork.h)
 target_include_directories(HypercubeHopfieldCore
     PUBLIC
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
-        $<INSTALL_INTERFACE:include/HypercubeHopfield>
+        $<INSTALL_INTERFACE:include>
 )
 
 # --- Optimization and warning flags (library) ---

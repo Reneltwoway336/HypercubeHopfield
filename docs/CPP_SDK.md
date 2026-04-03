@@ -82,7 +82,11 @@ cmake --build build
 ```
 
 Pin `GIT_TAG` to a release tag (e.g., `v0.1.0`) for reproducible builds.
-Include paths are set automatically -- just `#include "HopfieldNetwork.h"`.
+Include paths are set automatically -- use `#include "HopfieldNetwork.h"`.
+
+> **Note:** FetchContent exposes the project root as an include path, so the
+> bare include works. The namespaced `<HypercubeHopfield/HopfieldNetwork.h>`
+> form is available when using an installed SDK via `find_package`.
 
 ### Installed SDK (find_package)
 
@@ -117,7 +121,7 @@ cmake --build build
 ## Minimal example
 
 ```cpp
-#include <HypercubeHopfield/HopfieldNetwork.h>
+#include "HopfieldNetwork.h"  // or <HypercubeHopfield/HopfieldNetwork.h> if installed
 #include <cstdio>
 #include <random>
 #include <vector>

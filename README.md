@@ -38,7 +38,7 @@ The system is designed for DIM 4-16 (16 to 65536 neurons).
 
 ## Building and Running
 
-**Requirements:** C++23 compiler (GCC 13+, Clang 16+, MSVC 19.36+), CMake 4.1+.
+**Requirements:** C++23 compiler (GCC 13+, Clang 17+, MSVC 2022+), CMake 4.1+.
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
@@ -73,8 +73,16 @@ HypercubeHopfield/
     AutoAssociativeDemo    Sensor fault recovery (standalone exe + .md)
     HeteroAssociativeDemo  Diagnostic lookup (standalone exe + .md)
 
+  python/
+    hypercube_hopfield/    Python SDK package (pip install hypercube-hopfield)
+    bindings.cpp           Pybind11 C++ binding layer
+    CMakeLists.txt         Python extension build config
+    pyproject.toml         Package metadata and wheel build config
+    tests/                 Python SDK test suite
+
   docs/
     CPP_SDK.md             C++ SDK consumer guide (FetchContent, API reference)
+    Python_SDK.md          Python SDK reference (installation, API, persistence)
     HopfieldNetwork.md     Network architecture, connectivity, parameters
 ```
 
@@ -83,6 +91,7 @@ HypercubeHopfield/
 | Document | Covers |
 |----------|--------|
 | [docs/CPP_SDK.md](docs/CPP_SDK.md) | C++ SDK: FetchContent, find_package, API reference |
+| [docs/Python_SDK.md](docs/Python_SDK.md) | Python SDK: installation, API reference, persistence |
 | [docs/HopfieldNetwork.md](docs/HopfieldNetwork.md) | Hypercube connectivity, Hamming-ball masks, update rule, energy function, parameters |
 | [examples/AutoAssociativeDemo.md](examples/AutoAssociativeDemo.md) | Sensor fault recovery -- noise tolerance and dropout resilience |
 | [examples/HeteroAssociativeDemo.md](examples/HeteroAssociativeDemo.md) | Diagnostic lookup -- input-output mapping, noise, ambiguous inputs |
