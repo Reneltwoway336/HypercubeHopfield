@@ -13,7 +13,7 @@
 #include <vector>
 #include <random>
 
-/// Result returned by HopfieldNetwork::Recall().
+/// Result returned by Recall().
 struct RecallResult
 {
     size_t steps; ///< Number of update sweeps performed (0 if no patterns stored).
@@ -30,22 +30,55 @@ class IHopfieldNetwork
 public:
     virtual ~IHopfieldNetwork() = default;
 
+    // --- Topology ---
+
+    /// Hypercube dimension. NumVertices() == 2^Dim().
     [[nodiscard]] virtual size_t Dim() const = 0;
+    /// Number of vertices (neurons). Equal to 2^Dim().
     [[nodiscard]] virtual size_t NumVertices() const = 0;
 
+    // --- Core operations ---
+
+    /// Store a pattern (explicit storage, not Hebbian).
+    /// @param pattern Exactly NumVertices() continuous-valued floats.
+    /// @throws std::invalid_argument if pattern.size() != NumVertices().
     virtual void StorePattern(std::span<const float> pattern) = 0;
+
+    /// Run asynchronous recall sweeps until convergence or max_steps.
+    /// @param state In/out: NumVertices() floats, modified in place.
+    /// @param max_steps Maximum update sweeps.
+    /// @throws std::invalid_argument if state.size() != NumVertices().
     virtual RecallResult Recall(std::span<float> state, size_t max_steps = 100) = 0;
+
+    /// Compute the modern Hopfield energy for the given state.
+    /// @return Energy value, or nullopt if no patterns are stored.
+    /// @throws std::invalid_argument if state.size() != NumVertices().
     [[nodiscard]] virtual std::optional<float> Energy(std::span<const float> state) const = 0;
 
+    // --- Introspection (all needed for serialization/reconstruction) ---
+
+    /// Number of stored patterns.
     [[nodiscard]] virtual size_t NumPatterns() const = 0;
+    /// Original RNG seed passed at construction.
     [[nodiscard]] virtual uint64_t Seed() const = 0;
+    /// Hamming-ball radius for neighbor connectivity (1 to Dim()).
     [[nodiscard]] virtual size_t Reach() const = 0;
+    /// Fraction of the Hamming ball used (0.0, 1.0].
     [[nodiscard]] virtual float NeighborFraction() const = 0;
+    /// Inverse temperature for softmax attention.
     [[nodiscard]] virtual float Beta() const = 0;
+    /// Convergence threshold for Recall().
     [[nodiscard]] virtual float Tolerance() const = 0;
 
+    // --- Pattern management ---
+
+    /// Remove all stored patterns and reset state.
     virtual void Clear() = 0;
+    /// Read back a stored pattern by index.
+    /// @throws std::out_of_range if idx >= NumPatterns().
     [[nodiscard]] virtual std::span<const float> GetPattern(size_t idx) const = 0;
+    /// Remove the most recently stored pattern.
+    /// @throws std::out_of_range if NumPatterns() == 0.
     virtual void PopPattern() = 0;
 };
 
@@ -56,7 +89,8 @@ public:
 /// @param beta Inverse temperature for softmax attention.
 /// @param neighbor_fraction Fraction of Hamming ball to use (0.0-1.0).
 /// @param tolerance Convergence threshold for Recall().
-/// @throws std::invalid_argument if dim is outside [4, 16].
+/// @throws std::invalid_argument if dim is outside [4, 16], or if reach, beta,
+///         neighbor_fraction, or tolerance are out of valid range.
 std::unique_ptr<IHopfieldNetwork> CreateHopfieldNetwork(
     size_t dim, uint64_t rng_seed,
     size_t reach = 0,
@@ -66,11 +100,11 @@ std::unique_ptr<IHopfieldNetwork> CreateHopfieldNetwork(
 
 /// Modern Hopfield associative memory on a hypercube graph.
 ///
-/// Implements the exponential-energy Hopfield network of Ramsauer et al. (2021)
-/// on a DIM-dimensional hypercube with N = 2^DIM vertices. Vertices are
-/// addressed by DIM-bit binary strings; each vertex holds a continuous-valued
-/// state. Patterns are stored explicitly (not collapsed into weights) and
-/// retrieved via softmax attention, giving exponential memory capacity in N.
+/// Based on the exponential-energy Modern Hopfield framework (Ramsauer et al.,
+/// 2021), adapted to a DIM-dimensional hypercube with N = 2^DIM vertices.
+/// Vertices are addressed by DIM-bit binary strings; each holds a continuous-
+/// valued state. Patterns are stored explicitly (not collapsed into weights)
+/// and retrieved via softmax attention over sparse local neighborhoods.
 ///
 /// Architecture:
 ///   - Each vertex holds a continuous-valued state in the range produced by
@@ -82,11 +116,17 @@ std::unique_ptr<IHopfieldNetwork> CreateHopfieldNetwork(
 ///   - Convergence is detected when no vertex changes by more than `tolerance`
 ///     (default 1e-6) in a full sweep.
 ///
-/// Usage:
+/// Usage (template):
 ///   auto net = HopfieldNetwork<8>::Create(seed);
-///   net->StorePattern(pattern1);
-///   net->StorePattern(pattern2);
-///   net->Recall(noisy_cue);  // noisy_cue converges to nearest stored pattern
+///   std::vector<float> pat(net->NumVertices());
+///   // ... fill pat ...
+///   net->StorePattern(pat);                  // stores via span overload
+///   auto [steps, converged] = net->Recall(noisy_cue);  // modifies in place
+///
+/// Usage (factory, for SDK bindings):
+///   auto net = CreateHopfieldNetwork(8, seed);  // returns unique_ptr<IHopfieldNetwork>
+///   net->StorePattern(pat);
+///   auto [steps, converged] = net->Recall(noisy_cue);
 template <size_t DIM>
 class HopfieldNetwork : public IHopfieldNetwork
 {
@@ -210,7 +250,7 @@ private:
     mutable std::vector<float> patterns_t_; // col-major [N * num_patterns_] for fast Recall
     mutable bool patterns_dirty_ = true; // true when patterns_t_ needs rebuild
     std::vector<float> sim_buf_; // reusable similarity buffer [num_patterns_] for Recall
-    mutable std::vector<float> energy_buf_; // reusable similarity buffer [num_patterns_] for Energy
+    mutable std::vector<float> energy_buf_; // per-pattern similarity buffer for Energy() [num_patterns_]
     std::vector<size_t> perm_; // reusable permutation array for Recall [N]
     std::vector<uint32_t> conn_masks_; // precomputed neighbor masks: popcount(m) <= reach_
 
