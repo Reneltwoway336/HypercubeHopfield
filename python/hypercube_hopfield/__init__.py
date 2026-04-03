@@ -15,25 +15,45 @@ Quick start::
     net.store_patterns(patterns)
 
     cue = patterns[0] + np.random.randn(net.num_vertices).astype(np.float32) * 0.3
-    recalled, steps, converged = net.recall(cue)
-    print(f"Converged: {converged}, steps: {steps}")
+    result = net.recall(cue)
+    print(f"Converged: {result.converged}, steps: {result.steps}")
 """
 
 from __future__ import annotations
 
 import pathlib
 import pickle
+from typing import NamedTuple
+
 import numpy as np
 
 from ._core import UpdateMode, _HopfieldNetwork
 
 __version__ = "0.1.0"
-__all__ = ["HopfieldNetwork", "UpdateMode"]
+__all__ = ["HopfieldNetwork", "RecallResult", "UpdateMode", "__version__"]
 
 
 def _to_float32(arr):
     """Ensure array is C-contiguous float32."""
     return np.ascontiguousarray(arr, dtype=np.float32)
+
+
+class RecallResult(NamedTuple):
+    """Result of a recall operation.
+
+    Attributes
+    ----------
+    state : ndarray
+        The recalled (cleaned) state, shape ``(N,)``.
+    steps : int
+        Number of update sweeps performed.
+    converged : bool
+        True if the state stabilized within ``tolerance``.
+    """
+
+    state: np.ndarray
+    steps: int
+    converged: bool
 
 
 class HopfieldNetwork:
@@ -42,6 +62,13 @@ class HopfieldNetwork:
     The network has N = 2^dim neurons arranged on the vertices of a
     dim-dimensional Boolean hypercube. Patterns are stored explicitly and
     recalled via softmax attention over sparse Hamming-ball neighborhoods.
+
+    .. note::
+
+        This class is **not thread-safe**. Do not share instances across
+        threads. Create separate instances for concurrent use. The GIL is
+        released during ``recall()`` to allow other Python threads to run,
+        but the same network must not be accessed concurrently.
 
     Parameters
     ----------
@@ -69,8 +96,8 @@ class HopfieldNetwork:
     >>> net = hh.HopfieldNetwork(dim=8, seed=42)
     >>> pat = np.random.randn(256).astype(np.float32)
     >>> net.store_pattern(pat)
-    >>> recalled, steps, converged = net.recall(pat + np.random.randn(256).astype(np.float32) * 0.1)
-    >>> converged
+    >>> result = net.recall(pat + np.random.randn(256).astype(np.float32) * 0.1)
+    >>> result.converged
     True
     """
 
@@ -86,6 +113,18 @@ class HopfieldNetwork:
     ):
         if not isinstance(dim, int) or not (4 <= dim <= 16):
             raise ValueError(f"dim must be an integer in [4, 16], got {dim}")
+        if not isinstance(seed, int) or seed < 0:
+            raise ValueError(f"seed must be a non-negative integer, got {seed}")
+        if not isinstance(reach, int) or reach < 0:
+            raise ValueError(f"reach must be a non-negative integer, got {reach}")
+        if beta <= 0:
+            raise ValueError(f"beta must be positive, got {beta}")
+        if not (0.0 < neighbor_fraction <= 1.0):
+            raise ValueError(
+                f"neighbor_fraction must be in (0.0, 1.0], got {neighbor_fraction}"
+            )
+        if tolerance <= 0:
+            raise ValueError(f"tolerance must be positive, got {tolerance}")
         self._impl = _HopfieldNetwork(
             dim, seed, reach, beta, neighbor_fraction, tolerance,
         )
@@ -133,7 +172,7 @@ class HopfieldNetwork:
         *,
         max_steps: int = 100,
         mode: UpdateMode = UpdateMode.Sync,
-    ) -> tuple[np.ndarray, int, bool]:
+    ) -> RecallResult:
         """Recall a stored pattern from a (possibly noisy) cue.
 
         The input cue is **not** modified. A clean copy is returned.
@@ -151,19 +190,23 @@ class HopfieldNetwork:
 
         Returns
         -------
-        recalled : ndarray
-            The recalled (cleaned) state, shape ``(N,)``.
-        steps : int
-            Number of update sweeps performed.
-        converged : bool
-            True if the state stabilized within ``tolerance``.
+        RecallResult
+            Named tuple with fields ``state``, ``steps``, ``converged``.
 
         Examples
         --------
-        >>> recalled, steps, converged = net.recall(noisy_cue)
-        >>> print(f"Converged in {steps} steps: {converged}")
+        >>> result = net.recall(noisy_cue)
+        >>> print(f"Converged in {result.steps} steps: {result.converged}")
+        >>> recalled_state = result.state
         """
-        return self._impl.recall(_to_float32(cue), max_steps, mode)
+        if not isinstance(max_steps, int) or max_steps < 0:
+            raise ValueError(
+                f"max_steps must be a non-negative integer, got {max_steps}"
+            )
+        state, steps, converged = self._impl.recall(
+            _to_float32(cue), max_steps, mode,
+        )
+        return RecallResult(state, steps, converged)
 
     # ── Energy ──
 
@@ -201,12 +244,24 @@ class HopfieldNetwork:
         -------
         ndarray
             1D array of N floats (copy).
+
+        Raises
+        ------
+        IndexError
+            If ``idx`` is out of range.
         """
+        if not isinstance(idx, int) or idx < 0:
+            raise IndexError(
+                f"idx must be a non-negative integer, got {idx}"
+            )
         return self._impl.get_pattern(idx)
 
     @property
     def patterns(self) -> np.ndarray:
         """All stored patterns as a 2D array.
+
+        Returns a **copy** of all stored patterns. For networks with many
+        patterns at high dim, this allocates O(num_patterns * 2^dim) memory.
 
         Returns
         -------
@@ -306,7 +361,12 @@ class HopfieldNetwork:
         }
 
     def __setstate__(self, state: dict) -> None:
-        """Restore network from pickled state."""
+        """Restore network from pickled state.
+
+        Called by pickle on an object created via ``object.__new__``,
+        so ``self._impl`` does not exist yet. ``__init__`` is safe to
+        call here as it unconditionally assigns ``self._impl``.
+        """
         version = state.get("_version", 0)
         if version > self._PERSISTENCE_VERSION:
             raise ValueError(
@@ -326,7 +386,7 @@ class HopfieldNetwork:
         if len(patterns) > 0:
             self.store_patterns(patterns)
 
-    def save(self, path) -> None:
+    def save(self, path: str | pathlib.Path) -> None:
         """Save the network to a file.
 
         Saves the configuration and all stored patterns. The file is a
@@ -346,8 +406,14 @@ class HopfieldNetwork:
             pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     @classmethod
-    def load(cls, path) -> "HopfieldNetwork":
+    def load(cls, path: str | pathlib.Path) -> "HopfieldNetwork":
         """Load a saved network from a file.
+
+        .. warning::
+
+            This method uses ``pickle.load()`` internally. Never load
+            files from untrusted sources -- a malicious pickle file can
+            execute arbitrary code.
 
         Parameters
         ----------

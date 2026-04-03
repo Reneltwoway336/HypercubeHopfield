@@ -77,6 +77,8 @@ PYBIND11_MODULE(_core, m)
            "Recall from a noisy cue. Returns (recalled_state, steps, converged).")
 
         // ── Energy ──
+        // No GIL release: energy() reads the user's buffer directly (no copy),
+        // so releasing the GIL would allow another thread to mutate the array.
         .def("energy", [](const IHopfieldNetwork& self, FloatArray state) {
             auto buf = state.request();
             if (buf.ndim != 1)
@@ -87,11 +89,7 @@ PYBIND11_MODULE(_core, m)
                 throw std::invalid_argument(
                     "state size (" + std::to_string(n) + ") != num_vertices ("
                     + std::to_string(self.NumVertices()) + ")");
-            std::optional<float> e;
-            {
-                py::gil_scoped_release release;
-                e = self.Energy({static_cast<const float*>(buf.ptr), n});
-            }
+            auto e = self.Energy({static_cast<const float*>(buf.ptr), n});
             if (!e.has_value())
                 throw py::value_error("no patterns stored");
             return e.value();

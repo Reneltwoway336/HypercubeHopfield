@@ -20,9 +20,9 @@ target_include_directories(_core PRIVATE ${CORE_DIR})
 
 # Optimization flags
 if(MSVC)
-    target_compile_options(_core PRIVATE /O2 /fp:fast)
+    target_compile_options(_core PRIVATE /W4 /O2 /fp:fast)
 else()
-    target_compile_options(_core PRIVATE -O3 -ffast-math)
+    target_compile_options(_core PRIVATE -O3 -ffast-math -Wall -Wextra -Wno-unknown-pragmas)
     if(HYPERCUBE_ARCH STREQUAL "native")
         target_compile_options(_core PRIVATE -march=native -mtune=native)
     elseif(HYPERCUBE_ARCH STREQUAL "x86-64-v2")
@@ -31,7 +31,9 @@ else()
     # "none" = no -march flag (ARM, MSVC fallback)
 endif()
 
-# MinGW: static-link runtime DLLs for self-contained .pyd
+# MinGW: static-link runtime DLLs for self-contained .pyd.
+# Uses -static to statically link libgcc, libstdc++, and libwinpthread
+# (needed because HopfieldNetwork uses std::thread via ThreadPool.h).
 if(MINGW)
     target_link_options(_core PRIVATE
         -static-libgcc -static-libstdc++

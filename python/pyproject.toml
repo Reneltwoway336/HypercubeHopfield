@@ -36,6 +36,7 @@ test = ["pytest>=7.0"]
 [tool.scikit-build]
 cmake.build-type = "Release"
 wheel.packages = ["hypercube_hopfield"]
+sdist.include = ["/*.cpp", "/*.h"]
 
 [tool.pytest.ini_options]
 # importlib mode avoids source-dir shadowing the installed _core.pyd
@@ -61,11 +62,11 @@ environment = { PATH="/opt/rh/gcc-toolset-13/root/usr/bin:$PATH", CC="gcc", CXX=
 
 [tool.cibuildwheel.macos]
 archs = ["x86_64", "arm64"]
-environment = { SKBUILD_CMAKE_ARGS="-DHYPERCUBE_ARCH=x86-64-v2", MACOSX_DEPLOYMENT_TARGET="13.0" }
+environment = { SKBUILD_CMAKE_ARGS="-DHYPERCUBE_ARCH=x86-64-v2", MACOSX_DEPLOYMENT_TARGET="11.0" }
 
 [[tool.cibuildwheel.overrides]]
 select = "*-macosx_arm64"
-environment = { SKBUILD_CMAKE_ARGS="-DHYPERCUBE_ARCH=none", MACOSX_DEPLOYMENT_TARGET="13.0" }
+environment = { SKBUILD_CMAKE_ARGS="-DHYPERCUBE_ARCH=none", MACOSX_DEPLOYMENT_TARGET="11.0" }
 
 [tool.cibuildwheel.windows]
 archs = ["AMD64"]
