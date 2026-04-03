@@ -2,10 +2,11 @@
 
 ## What is EnergyMonotonicity?
 
-Verifies that the network energy E(s) is non-increasing across asynchronous
-update sweeps during recall. This is a fundamental guarantee of Hopfield
-networks: each update step should either decrease energy or leave it unchanged.
-An energy increase indicates a bug in the update rule or energy function.
+Verifies that the network energy E(s) is non-increasing across update
+sweeps during recall (default Sync mode). This is a fundamental guarantee
+of Hopfield networks: each sweep should either decrease energy or leave it
+unchanged. An energy increase indicates a bug in the update rule or energy
+function.
 
 The modern Hopfield energy is:
 

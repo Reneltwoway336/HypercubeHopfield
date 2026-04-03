@@ -12,9 +12,9 @@
 /// @brief Diagnostic: verify energy is non-increasing across recall sweeps.
 ///
 /// Stores 3 patterns, starts from a random state, and runs single-sweep Recall()
-/// steps while tracking energy. Classical and modern Hopfield theory guarantees
-/// monotonic energy descent under asynchronous updates. Violations indicate a
-/// bug in the energy function or update rule.
+/// steps while tracking energy. Modern Hopfield theory guarantees monotonic
+/// energy descent. Violations indicate a bug in the energy function or update
+/// rule. Uses the default update mode (Sync).
 ///
 /// Tested across all 3 seeds. Pass criterion: no energy increase > epsilon (1e-3)
 /// between consecutive sweeps on any seed.
@@ -118,10 +118,11 @@ private:
         {
             std::fprintf(md, "# EnergyMonotonicity Results\n\n");
             std::fprintf(md, "## What is EnergyMonotonicity?\n\n");
-            std::fprintf(md, "Verifies that the network energy E(s) is non-increasing across asynchronous\n");
-            std::fprintf(md, "update sweeps during recall. This is a fundamental guarantee of Hopfield\n");
-            std::fprintf(md, "networks: each update step should either decrease energy or leave it unchanged.\n");
-            std::fprintf(md, "An energy increase indicates a bug in the update rule or energy function.\n\n");
+            std::fprintf(md, "Verifies that the network energy E(s) is non-increasing across update\n");
+            std::fprintf(md, "sweeps during recall (default Sync mode). This is a fundamental guarantee\n");
+            std::fprintf(md, "of Hopfield networks: each sweep should either decrease energy or leave it\n");
+            std::fprintf(md, "unchanged. An energy increase indicates a bug in the update rule or energy\n");
+            std::fprintf(md, "function.\n\n");
             std::fprintf(md, "The modern Hopfield energy is:\n\n");
             std::fprintf(md, "    E(s) = -(1/N) * sum_v [ beta^-1 * log(sum_mu exp(beta * sim_mu(v))) ]\n\n");
             std::fprintf(md, "---\n\n");
