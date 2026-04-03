@@ -23,6 +23,7 @@ association.
 | Input half     | 128   |
 | Output half    | 128   |
 | Stored pairs   | 15    |
+| Update mode    | Sync  |
 
 ---
 
