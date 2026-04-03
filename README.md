@@ -1,5 +1,9 @@
 # HypercubeHopfield
 
+[![Build wheels](https://github.com/dliptak001/HypercubeHopfield/actions/workflows/wheels.yml/badge.svg)](https://github.com/dliptak001/HypercubeHopfield/actions/workflows/wheels.yml)
+[![PyPI](https://img.shields.io/pypi/v/hypercube-hopfield)](https://pypi.org/project/hypercube-hopfield/)
+[![PyPI version](https://img.shields.io/pypi/v/hypercube-hopfield?label=v&color=orange)](https://pypi.org/project/hypercube-hopfield/)
+
 A sparse local-attention variant of the Modern Hopfield network built on a
 hypercube graph. Uses softmax-attention retrieval with Hamming-ball connectivity for
 a deliberate tradeoff: lower per-update cost than fully-connected Hopfield networks
