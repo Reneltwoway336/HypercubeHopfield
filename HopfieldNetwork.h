@@ -253,7 +253,6 @@ private:
     size_t num_patterns_ = 0;
     std::mt19937_64 rng_; // persists across Recall() calls for varied orderings
 
-    alignas(64) float vtx_state_[N]{};
     std::vector<float> patterns_; // row-major [num_patterns_ * N] for StorePattern
     mutable std::vector<float> patterns_t_; // col-major [N * num_patterns_] for fast Recall
     mutable bool patterns_dirty_ = true; // true when patterns_t_ needs rebuild
@@ -265,5 +264,5 @@ private:
     void Initialize();
     void BuildMaskTable();
     void EnsureTransposed() const;
-    void UpdateVertex(size_t v);
+    void UpdateVertex(size_t v, float* state);
 };

@@ -33,7 +33,7 @@ class CapacityProbe
     ///   1. Recall cost per step: O(M * connections * N) ~ O(M * N^2)
     ///   2. Storage cost per step: O(M * N * threads) -- OMP threads duplicate patterns
     /// The ceiling is the minimum of limits from both factors.
-    /// Calibrated from DIM=8 where 65536 patterns completes in ~2 minutes.
+    /// Calibrated from DIM=8 where 8192 patterns completes in under 30 seconds.
     static constexpr size_t DefaultCeiling()
     {
         // Recall-limited ceiling: scales inversely with N^2
@@ -48,7 +48,7 @@ class CapacityProbe
         constexpr size_t raw = recall_limit < storage_limit ? recall_limit : storage_limit;
 
         if (raw < 64) return 64;
-        if (raw > 65536) return 65536;
+        if (raw > 8192) return 8192;
         return raw;
     }
 

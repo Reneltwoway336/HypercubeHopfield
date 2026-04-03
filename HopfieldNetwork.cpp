@@ -83,7 +83,6 @@ void HopfieldNetwork<DIM>::Initialize()
     sim_buf_.clear();
     perm_.resize(N);
     std::iota(perm_.begin(), perm_.end(), 0);
-    std::memset(vtx_state_, 0, sizeof(vtx_state_));
     num_patterns_ = 0;
 }
 
@@ -126,9 +125,6 @@ RecallResult HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps)
 
     EnsureTransposed();
 
-    // Copy input state into internal buffer
-    std::copy(state, state + N, vtx_state_);
-
     for (size_t step = 0; step < max_steps; ++step)
     {
         std::shuffle(perm_.begin(), perm_.end(), rng_);
@@ -137,22 +133,16 @@ RecallResult HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps)
         for (size_t idx = 0; idx < N; ++idx)
         {
             const size_t v = perm_[idx];
-            const float old_val = vtx_state_[v];
-            UpdateVertex(v);
-            if (std::fabs(vtx_state_[v] - old_val) > tolerance_)
+            const float old_val = state[v];
+            UpdateVertex(v, state);
+            if (std::fabs(state[v] - old_val) > tolerance_)
                 changed = true;
         }
 
         if (!changed)
-        {
-            // Converged -- copy result back
-            std::copy(vtx_state_, vtx_state_ + N, state);
             return {step + 1, true};
-        }
     }
 
-    // Did not converge within max_steps
-    std::copy(vtx_state_, vtx_state_ + N, state);
     return {max_steps, false};
 }
 
@@ -213,7 +203,7 @@ void HopfieldNetwork<DIM>::Clear()
 }
 
 template <size_t DIM>
-void HopfieldNetwork<DIM>::UpdateVertex(size_t v)
+void HopfieldNetwork<DIM>::UpdateVertex(size_t v, float* state)
 {
     // Modern Hopfield update via softmax attention over stored patterns.
     // Uses transposed pattern layout + connection-outer loop for cache efficiency.
@@ -237,7 +227,7 @@ void HopfieldNetwork<DIM>::UpdateVertex(size_t v)
     for (size_t c = 0; c < num_masks; ++c)
     {
         const size_t nb = v ^ masks[c];
-        const float nb_state = vtx_state_[nb];
+        const float nb_state = state[nb];
         const float* pt_nb = pt + nb * M;
         for (size_t mu = 0; mu < M; ++mu)
             sim[mu] += nb_state * pt_nb[mu];
@@ -262,7 +252,7 @@ void HopfieldNetwork<DIM>::UpdateVertex(size_t v)
     for (size_t mu = 0; mu < M; ++mu)
         h += (sim[mu] * inv_sum) * pt_v[mu];
 
-    vtx_state_[v] = h;
+    state[v] = h;
 }
 
 // --- Runtime DIM factory ---
