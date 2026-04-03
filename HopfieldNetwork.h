@@ -66,7 +66,7 @@ public:
     ///             Sync (double-buffered, deterministic, GPU-portable).
     /// @throws std::invalid_argument if state.size() != NumVertices().
     virtual RecallResult Recall(std::span<float> state, size_t max_steps = 100,
-                                UpdateMode mode = UpdateMode::Async) = 0;
+                                UpdateMode mode = UpdateMode::Sync) = 0;
 
     /// Compute the modern Hopfield energy for the given state.
     /// @return Energy value, or nullopt if no patterns are stored.
@@ -198,7 +198,7 @@ public:
     }
 
     RecallResult Recall(std::span<float> state, size_t max_steps = 100,
-                        UpdateMode mode = UpdateMode::Async) override
+                        UpdateMode mode = UpdateMode::Sync) override
     {
         if (state.size() != N)
             throw std::invalid_argument("Recall: expected " + std::to_string(N)
@@ -252,7 +252,7 @@ public:
     /// @param max_steps Maximum update sweeps before declaring non-convergence.
     /// @param mode Async or Sync update strategy.
     RecallResult Recall(float* state, size_t max_steps = 100,
-                        UpdateMode mode = UpdateMode::Async);
+                        UpdateMode mode = UpdateMode::Sync);
 
     /// @brief Compute modern Hopfield energy for the given state.
     /// @return Energy value, or nullopt if no patterns are stored.
