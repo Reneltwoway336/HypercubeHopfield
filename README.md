@@ -46,9 +46,8 @@ cmake --build build
 ./build/HypercubeHopfield
 ```
 
-OpenMP is optional; used only by the diagnostics suite (CapacityProbe) for parallel
-trial execution. The core HopfieldNetwork class is single-threaded with no OpenMP
-dependency. The build system detects MinGW, GCC/Clang, and MSVC automatically.
+No external dependencies beyond the C++ standard library. The build system detects
+MinGW, GCC/Clang, and MSVC automatically.
 
 ## Project Structure
 

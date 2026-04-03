@@ -18,8 +18,7 @@
 /// count where mean overlap stays >= 0.90 before the first drop below threshold.
 ///
 /// At high pattern counts, tests a random sample of patterns (default 64) rather
-/// than all M, reducing the cost from O(M^2) to O(M). The recall tests within
-/// each seed are parallelized across threads via OMP.
+/// than all M, reducing the cost from O(M^2) to O(M).
 ///
 /// The default ceiling is scaled per DIM to target ~5 minute runtime at default
 /// reach=DIM/2. Override max_patterns in the constructor to probe deeper.
@@ -31,7 +30,7 @@ class CapacityProbe
     /// Intelligent default ceiling scaled by DIM.
     /// Two cost factors limit the ceiling:
     ///   1. Recall cost per step: O(M * connections * N) ~ O(M * N^2)
-    ///   2. Storage cost per step: O(M * N * threads) -- OMP threads duplicate patterns
+    ///   2. Storage cost per step: O(M * N)
     /// The ceiling is the minimum of limits from both factors.
     /// Calibrated from DIM=8 where 8192 patterns completes in under 30 seconds.
     static constexpr size_t DefaultCeiling()
@@ -111,41 +110,33 @@ public:
                     test_indices.resize(test_count);
                 }
 
-                // Per-thread accumulators for OMP reduction
-                float par_overlap = 0.0f;
-                float par_min_ovlp = 2.0f;
-                float par_sweeps = 0.0f;
+                auto net = HopfieldNetwork<DIM>::Create(seed * 10000 + count + 1);
+                for (size_t p = 0; p < count; ++p)
+                    net->StorePattern(patterns.data() + p * N);
 
-                #pragma omp parallel reduction(+:par_overlap,par_sweeps) reduction(min:par_min_ovlp)
+                float total_overlap = 0.0f;
+                float min_ovlp = 2.0f;
+                float total_sweeps = 0.0f;
+                std::vector<float> noisy(N);
+
+                for (size_t ti = 0; ti < test_count; ++ti)
                 {
-                    // Each thread gets its own network copy (for vtx_state_ / sim_buf_)
-                    auto thread_net = HopfieldNetwork<DIM>::Create(seed * 10000 + count + 1);
-                    for (size_t p = 0; p < count; ++p)
-                        thread_net->StorePattern(patterns.data() + p * N);
+                    const size_t p = test_indices[ti];
+                    const float* orig = patterns.data() + p * N;
 
-                    std::vector<float> noisy(N);
+                    std::mt19937_64 corrupt_rng(seed * 10000 + count * 100 + p);
+                    CorruptPattern<N>(orig, noisy.data(), noise, corrupt_rng);
 
-                    #pragma omp for schedule(dynamic)
-                    for (size_t ti = 0; ti < test_count; ++ti)
-                    {
-                        const size_t p = test_indices[ti];
-                        const float* orig = patterns.data() + p * N;
-
-                        // Each thread needs its own RNG for corruption
-                        std::mt19937_64 thread_rng(seed * 10000 + count * 100 + p);
-                        CorruptPattern<N>(orig, noisy.data(), noise, thread_rng);
-
-                        const auto result = thread_net->Recall(noisy.data(), 100);
-                        const float overlap = ComputeOverlap<N>(orig, noisy.data());
-                        par_overlap += overlap;
-                        par_sweeps += static_cast<float>(result.steps);
-                        if (overlap < par_min_ovlp) par_min_ovlp = overlap;
-                    }
+                    const auto result = net->Recall(noisy.data(), 100);
+                    const float overlap = ComputeOverlap<N>(orig, noisy.data());
+                    total_overlap += overlap;
+                    total_sweeps += static_cast<float>(result.steps);
+                    if (overlap < min_ovlp) min_ovlp = overlap;
                 }
 
-                seed_overlap[si] = par_overlap;
-                seed_min_ovlp[si] = par_min_ovlp;
-                seed_sweeps[si] = par_sweeps;
+                seed_overlap[si] = total_overlap;
+                seed_min_ovlp[si] = min_ovlp;
+                seed_sweeps[si] = total_sweeps;
             }
 
             // Aggregate across seeds

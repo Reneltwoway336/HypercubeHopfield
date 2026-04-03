@@ -14,19 +14,6 @@ add_executable(HypercubeHopfield ${SOURCES})
 
 target_include_directories(HypercubeHopfield PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/diagnostics)
 
-# --- OpenMP: used only by diagnostics (CapacityProbe), not by HopfieldNetwork ---
-if(MINGW)
-    target_compile_options(HypercubeHopfield PRIVATE -fopenmp)
-    target_link_options(HypercubeHopfield PRIVATE -fopenmp)
-elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU" AND NOT MINGW)
-    find_package(OpenMP QUIET)
-    if(OpenMP_CXX_FOUND)
-        target_link_libraries(HypercubeHopfield OpenMP::OpenMP_CXX)
-    endif()
-elseif(MSVC)
-    target_compile_options(HypercubeHopfield PRIVATE /openmp)
-endif()
-
 # --- Optimization and warning flags ---
 if(MSVC)
     target_compile_options(HypercubeHopfield PRIVATE
@@ -41,7 +28,7 @@ else()
             $<$<CONFIG:Debug>:
             -O0 -g
             >
-            -Wall -Wextra -Wno-unknown-pragmas
+            -Wall -Wextra
     )
 endif()
 
@@ -63,7 +50,7 @@ foreach(EXAMPLE_SRC ${EXAMPLE_SOURCES})
     add_executable(${EXAMPLE_NAME} ${EXAMPLE_SRC} ${EXAMPLE_COMMON_SOURCES})
     target_include_directories(${EXAMPLE_NAME} PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/diagnostics)
 
-    # Examples do not use OpenMP -- only link static runtime on MinGW
+    # Static runtime on MinGW for easier distribution
     if(MINGW)
         target_link_options(${EXAMPLE_NAME} PRIVATE -static-libgcc -static-libstdc++)
     endif()
@@ -74,7 +61,7 @@ foreach(EXAMPLE_SRC ${EXAMPLE_SOURCES})
         target_compile_options(${EXAMPLE_NAME} PRIVATE
             $<$<CONFIG:Release>:-O3 -march=native -mtune=native -ffast-math>
             $<$<CONFIG:Debug>:-O0 -g>
-            -Wall -Wextra -Wno-unknown-pragmas
+            -Wall -Wextra
         )
     endif()
 endforeach()
