@@ -9,6 +9,7 @@
 #include <optional>
 #include <span>
 #include <stdexcept>
+#include <string>
 #include <vector>
 #include <random>
 
@@ -37,8 +38,8 @@ public:
     [[nodiscard]] virtual std::optional<float> Energy(std::span<const float> state) const = 0;
 
     [[nodiscard]] virtual size_t NumPatterns() const = 0;
+    [[nodiscard]] virtual uint64_t Seed() const = 0;
     [[nodiscard]] virtual size_t Reach() const = 0;
-    [[nodiscard]] virtual size_t NumConnections() const = 0;
     [[nodiscard]] virtual float NeighborFraction() const = 0;
     [[nodiscard]] virtual float Beta() const = 0;
     [[nodiscard]] virtual float Tolerance() const = 0;
@@ -130,27 +131,30 @@ public:
     void StorePattern(std::span<const float> pattern) override
     {
         if (pattern.size() != N)
-            throw std::invalid_argument("pattern must have exactly num_vertices elements");
+            throw std::invalid_argument("StorePattern: expected " + std::to_string(N)
+                + " elements, got " + std::to_string(pattern.size()));
         StorePattern(pattern.data());
     }
 
     RecallResult Recall(std::span<float> state, size_t max_steps = 100) override
     {
         if (state.size() != N)
-            throw std::invalid_argument("state must have exactly num_vertices elements");
+            throw std::invalid_argument("Recall: expected " + std::to_string(N)
+                + " elements, got " + std::to_string(state.size()));
         return Recall(state.data(), max_steps);
     }
 
     [[nodiscard]] std::optional<float> Energy(std::span<const float> state) const override
     {
         if (state.size() != N)
-            throw std::invalid_argument("state must have exactly num_vertices elements");
+            throw std::invalid_argument("Energy: expected " + std::to_string(N)
+                + " elements, got " + std::to_string(state.size()));
         return Energy(state.data());
     }
 
     [[nodiscard]] size_t NumPatterns() const override { return num_patterns_; }
+    [[nodiscard]] uint64_t Seed() const override { return seed_; }
     [[nodiscard]] size_t Reach() const override { return reach_; }
-    [[nodiscard]] size_t NumConnections() const override { return conn_masks_.size(); }
     [[nodiscard]] float NeighborFraction() const override { return neighbor_fraction_; }
     [[nodiscard]] float Beta() const override { return beta_; }
     [[nodiscard]] float Tolerance() const override { return tolerance_; }
@@ -160,7 +164,8 @@ public:
     [[nodiscard]] std::span<const float> GetPattern(size_t idx) const override
     {
         if (idx >= num_patterns_)
-            throw std::out_of_range("pattern index out of range");
+            throw std::out_of_range("GetPattern: index " + std::to_string(idx)
+                + " >= num_patterns " + std::to_string(num_patterns_));
         return {patterns_.data() + idx * N, N};
     }
 
@@ -192,6 +197,7 @@ public:
 private:
     HopfieldNetwork(uint64_t rng_seed, size_t reach, float beta, float neighbor_fraction, float tolerance);
 
+    uint64_t seed_; // original RNG seed (for serialization)
     size_t reach_; // Hamming-ball radius (1..DIM)
     float beta_; // inverse temperature for softmax attention
     float neighbor_fraction_; // fraction of Hamming ball used (0.0-1.0)

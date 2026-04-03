@@ -10,6 +10,7 @@
 #include <limits>
 #include <numeric>
 #include <stdexcept>
+#include <string>
 
 // Explicit template instantiations for supported DIM values (4-16)
 template class HopfieldNetwork<4>;
@@ -30,16 +31,19 @@ template class HopfieldNetwork<16>;
 
 template <size_t DIM>
 HopfieldNetwork<DIM>::HopfieldNetwork(uint64_t rng_seed, size_t reach, float beta, float neighbor_fraction, float tolerance)
-    : reach_(reach), beta_(beta), neighbor_fraction_(neighbor_fraction), tolerance_(tolerance), rng_(rng_seed)
+    : seed_(rng_seed), reach_(reach), beta_(beta), neighbor_fraction_(neighbor_fraction), tolerance_(tolerance), rng_(rng_seed)
 {
     if (reach_ < 1 || reach_ > DIM)
-        throw std::invalid_argument("reach must be in [1, DIM]");
+        throw std::invalid_argument("reach must be in [1, " + std::to_string(DIM)
+            + "], got " + std::to_string(reach_));
     if (beta_ <= 0.0f)
-        throw std::invalid_argument("beta must be positive");
+        throw std::invalid_argument("beta must be positive, got " + std::to_string(beta_));
     if (neighbor_fraction_ <= 0.0f || neighbor_fraction_ > 1.0f)
-        throw std::invalid_argument("neighbor_fraction must be in (0.0, 1.0]");
+        throw std::invalid_argument("neighbor_fraction must be in (0.0, 1.0], got "
+            + std::to_string(neighbor_fraction_));
     if (tolerance_ < 0.0f)
-        throw std::invalid_argument("tolerance must be non-negative");
+        throw std::invalid_argument("tolerance must be non-negative, got "
+            + std::to_string(tolerance_));
     BuildMaskTable();
     Initialize();
 }
@@ -290,6 +294,6 @@ std::unique_ptr<IHopfieldNetwork> CreateHopfieldNetwork(
         case 15: return CreateForDim<15>(rng_seed, reach, beta, neighbor_fraction, tolerance);
         case 16: return CreateForDim<16>(rng_seed, reach, beta, neighbor_fraction, tolerance);
         default:
-            throw std::invalid_argument("dim must be in [4, 16]");
+            throw std::invalid_argument("dim must be in [4, 16], got " + std::to_string(dim));
     }
 }
