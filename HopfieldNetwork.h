@@ -13,6 +13,13 @@
 #include <vector>
 #include <random>
 
+/// Update mode for Recall().
+enum class UpdateMode : uint8_t
+{
+    Async, ///< Sequential random-order updates. Guaranteed energy descent.
+    Sync   ///< Simultaneous double-buffered updates. Deterministic, GPU-portable.
+};
+
 /// Result returned by Recall().
 struct RecallResult
 {
@@ -50,11 +57,14 @@ public:
     /// @throws std::invalid_argument if pattern.size() != NumVertices().
     virtual void StorePattern(std::span<const float> pattern) = 0;
 
-    /// Run asynchronous recall sweeps until convergence or max_steps.
+    /// Run recall sweeps until convergence or max_steps.
     /// @param state In/out: NumVertices() floats, modified in place.
     /// @param max_steps Maximum update sweeps.
+    /// @param mode Async (random-order, guaranteed convergence) or
+    ///             Sync (double-buffered, deterministic, GPU-portable).
     /// @throws std::invalid_argument if state.size() != NumVertices().
-    virtual RecallResult Recall(std::span<float> state, size_t max_steps = 100) = 0;
+    virtual RecallResult Recall(std::span<float> state, size_t max_steps = 100,
+                                UpdateMode mode = UpdateMode::Async) = 0;
 
     /// Compute the modern Hopfield energy for the given state.
     /// @return Energy value, or nullopt if no patterns are stored.
@@ -117,10 +127,10 @@ std::unique_ptr<IHopfieldNetwork> CreateHopfieldNetwork(
 ///     softmax-weighted voting over stored patterns.
 ///   - Neighbors are all vertices within Hamming distance `reach` (the Hamming
 ///     ball). Neighbor lookup is a single XOR -- no adjacency storage required.
-///   - Asynchronous updates: each sweep visits every vertex in random order,
-///     replacing its state with the softmax-attention output over its neighbors.
-///   - Convergence is detected when no vertex changes by more than `tolerance`
-///     (default 1e-6) in a full sweep.
+///   - Two update modes: Async (random-order sequential, guaranteed energy
+///     descent) and Sync (double-buffered simultaneous, deterministic and
+///     GPU-portable). Both detect convergence when no vertex changes by more
+///     than `tolerance` (default 1e-6) in a full sweep.
 ///
 /// Usage (template):
 ///   auto net = HopfieldNetwork<8>::Create(seed);
@@ -184,12 +194,13 @@ public:
         StorePattern(pattern.data());
     }
 
-    RecallResult Recall(std::span<float> state, size_t max_steps = 100) override
+    RecallResult Recall(std::span<float> state, size_t max_steps = 100,
+                        UpdateMode mode = UpdateMode::Async) override
     {
         if (state.size() != N)
             throw std::invalid_argument("Recall: expected " + std::to_string(N)
                 + " elements, got " + std::to_string(state.size()));
-        return Recall(state.data(), max_steps);
+        return Recall(state.data(), max_steps, mode);
     }
 
     [[nodiscard]] std::optional<float> Energy(std::span<const float> state) const override
@@ -233,10 +244,12 @@ public:
     /// @param pattern Pointer to N floats (continuous-valued).
     void StorePattern(const float* pattern);
 
-    /// @brief Run asynchronous updates until convergence or max_steps.
+    /// @brief Run recall until convergence or max_steps.
     /// @param state In/out: pointer to N-element state array. Modified in place.
     /// @param max_steps Maximum update sweeps before declaring non-convergence.
-    RecallResult Recall(float* state, size_t max_steps = 100);
+    /// @param mode Async or Sync update strategy.
+    RecallResult Recall(float* state, size_t max_steps = 100,
+                        UpdateMode mode = UpdateMode::Async);
 
     /// @brief Compute modern Hopfield energy for the given state.
     /// @return Energy value, or nullopt if no patterns are stored.
@@ -258,11 +271,12 @@ private:
     mutable bool patterns_dirty_ = true; // true when patterns_t_ needs rebuild
     std::vector<float> sim_buf_; // reusable similarity buffer [num_patterns_] for Recall
     mutable std::vector<float> energy_buf_; // per-pattern similarity buffer for Energy() [num_patterns_]
-    std::vector<uint32_t> perm_; // reusable permutation array for Recall [N]
+    std::vector<float> sync_buf_; // double buffer for Sync mode [N]
+    std::vector<uint32_t> perm_; // reusable permutation array for Async Recall [N]
     std::vector<uint32_t> conn_masks_; // precomputed neighbor masks: popcount(m) <= reach_
 
     void Initialize();
     void BuildMaskTable();
     void EnsureTransposed() const;
-    void UpdateVertex(size_t v, float* state);
+    void UpdateVertex(size_t v, const float* read_state, float* write_state);
 };

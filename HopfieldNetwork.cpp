@@ -115,34 +115,70 @@ void HopfieldNetwork<DIM>::StorePattern(const float* pattern)
 }
 
 template <size_t DIM>
-RecallResult HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps)
+RecallResult HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps, UpdateMode mode)
 {
     if (num_patterns_ == 0)
-    {
-        // Nothing to recall against -- return input unchanged.
         return {0, false};
-    }
 
     EnsureTransposed();
 
+    if (mode == UpdateMode::Async)
+    {
+        // Async: sequential random-order updates, read and write same buffer.
+        // Guaranteed monotonic energy descent.
+        for (size_t step = 0; step < max_steps; ++step)
+        {
+            std::shuffle(perm_.begin(), perm_.end(), rng_);
+            bool changed = false;
+
+            for (size_t idx = 0; idx < N; ++idx)
+            {
+                const size_t v = perm_[idx];
+                const float old_val = state[v];
+                UpdateVertex(v, state, state);
+                if (std::fabs(state[v] - old_val) > tolerance_)
+                    changed = true;
+            }
+
+            if (!changed)
+                return {step + 1, true};
+        }
+
+        return {max_steps, false};
+    }
+
+    // Sync: simultaneous double-buffered updates. All vertices read from
+    // the same snapshot and write to a separate buffer. Vertex order is
+    // irrelevant -- each update is independent. GPU-portable.
+    sync_buf_.resize(N);
+    float* read_ptr = state;
+    float* write_ptr = sync_buf_.data();
+
     for (size_t step = 0; step < max_steps; ++step)
     {
-        std::shuffle(perm_.begin(), perm_.end(), rng_);
         bool changed = false;
 
-        for (size_t idx = 0; idx < N; ++idx)
+        for (size_t v = 0; v < N; ++v)
         {
-            const size_t v = perm_[idx];
-            const float old_val = state[v];
-            UpdateVertex(v, state);
-            if (std::fabs(state[v] - old_val) > tolerance_)
+            UpdateVertex(v, read_ptr, write_ptr);
+            if (std::fabs(write_ptr[v] - read_ptr[v]) > tolerance_)
                 changed = true;
         }
 
+        std::swap(read_ptr, write_ptr);
+
         if (!changed)
+        {
+            // Result is now in read_ptr after the swap
+            if (read_ptr != state)
+                std::copy(read_ptr, read_ptr + N, state);
             return {step + 1, true};
+        }
     }
 
+    // Did not converge -- result is in read_ptr after last swap
+    if (read_ptr != state)
+        std::copy(read_ptr, read_ptr + N, state);
     return {max_steps, false};
 }
 
@@ -203,18 +239,19 @@ void HopfieldNetwork<DIM>::Clear()
 }
 
 template <size_t DIM>
-void HopfieldNetwork<DIM>::UpdateVertex(size_t v, float* state)
+void HopfieldNetwork<DIM>::UpdateVertex(size_t v, const float* read_state, float* write_state)
 {
     // Modern Hopfield update via softmax attention over stored patterns.
     // Uses transposed pattern layout + connection-outer loop for cache efficiency.
     //
+    // read_state and write_state may alias (Async mode) or differ (Sync mode).
+    //
     // Phase 1: Accumulate similarity to each pattern through Hamming-ball neighbors.
-    //          Loop structure: for each neighbor, saxpy into sim buffer.
-    //          sim[mu] += state[nb] * patterns_t[nb * M + mu]
+    //          sim[mu] += read_state[nb] * patterns_t[nb * M + mu]
     //
     // Phase 2: Softmax with inverse temperature beta.
     //
-    // Phase 3: Weighted vote of patterns at vertex v (continuous output).
+    // Phase 3: Weighted vote of patterns at vertex v -> write_state[v].
 
     const uint32_t* masks = conn_masks_.data();
     const size_t num_masks = conn_masks_.size();
@@ -227,7 +264,7 @@ void HopfieldNetwork<DIM>::UpdateVertex(size_t v, float* state)
     for (size_t c = 0; c < num_masks; ++c)
     {
         const size_t nb = v ^ masks[c];
-        const float nb_state = state[nb];
+        const float nb_state = read_state[nb];
         const float* pt_nb = pt + nb * M;
         for (size_t mu = 0; mu < M; ++mu)
             sim[mu] += nb_state * pt_nb[mu];
@@ -252,7 +289,7 @@ void HopfieldNetwork<DIM>::UpdateVertex(size_t v, float* state)
     for (size_t mu = 0; mu < M; ++mu)
         h += (sim[mu] * inv_sum) * pt_v[mu];
 
-    state[v] = h;
+    write_state[v] = h;
 }
 
 // --- Runtime DIM factory ---
