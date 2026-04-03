@@ -74,7 +74,7 @@ int main()
         const float before = ComputeOverlap<N>(
             profiles[test_profile].data(), corrupted.data());
 
-        const size_t steps = net->Recall(corrupted.data());
+        const auto [steps, converged] = net->Recall(corrupted.data());
 
         const float after = ComputeOverlap<N>(
             profiles[test_profile].data(), corrupted.data());
@@ -131,7 +131,7 @@ int main()
         const float before = ComputeOverlap<N>(
             profiles[test_profile].data(), dropout.data());
 
-        const size_t steps = net->Recall(dropout.data());
+        const auto [steps, converged] = net->Recall(dropout.data());
 
         const float after = ComputeOverlap<N>(
             profiles[test_profile].data(), dropout.data());

@@ -135,10 +135,10 @@ public:
                         std::mt19937_64 thread_rng(seed * 10000 + count * 100 + p);
                         CorruptPattern<N>(orig, noisy.data(), noise, thread_rng);
 
-                        const size_t sweeps = thread_net->Recall(noisy.data(), 100);
+                        const auto result = thread_net->Recall(noisy.data(), 100);
                         const float overlap = ComputeOverlap<N>(orig, noisy.data());
                         par_overlap += overlap;
-                        par_sweeps += static_cast<float>(sweeps);
+                        par_sweeps += static_cast<float>(result.steps);
                         if (overlap < par_min_ovlp) par_min_ovlp = overlap;
                     }
                 }

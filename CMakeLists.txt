@@ -14,20 +14,16 @@ add_executable(HypercubeHopfield ${SOURCES})
 
 target_include_directories(HypercubeHopfield PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/diagnostics)
 
-# --- Compiler-specific OpenMP handling ---
+# --- OpenMP: used only by diagnostics (CapacityProbe), not by HopfieldNetwork ---
 if(MINGW)
-    # MinGW requires -fopenmp for both compilation and linking to enable libgomp
     target_compile_options(HypercubeHopfield PRIVATE -fopenmp)
     target_link_options(HypercubeHopfield PRIVATE -fopenmp)
-    # -fopenmp automatically defines _OPENMP for the preprocessor
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU" AND NOT MINGW)
-    # Standard CMake OpenMP support works well on Linux/macOS GCC/Clang
     find_package(OpenMP QUIET)
     if(OpenMP_CXX_FOUND)
         target_link_libraries(HypercubeHopfield OpenMP::OpenMP_CXX)
     endif()
 elseif(MSVC)
-    # MSVC has built-in OpenMP support via /openmp flag
     target_compile_options(HypercubeHopfield PRIVATE /openmp)
 endif()
 
@@ -67,16 +63,9 @@ foreach(EXAMPLE_SRC ${EXAMPLE_SOURCES})
     add_executable(${EXAMPLE_NAME} ${EXAMPLE_SRC} ${EXAMPLE_COMMON_SOURCES})
     target_include_directories(${EXAMPLE_NAME} PRIVATE ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/diagnostics)
 
+    # Examples do not use OpenMP -- only link static runtime on MinGW
     if(MINGW)
-        target_compile_options(${EXAMPLE_NAME} PRIVATE -fopenmp)
-        target_link_options(${EXAMPLE_NAME} PRIVATE -fopenmp -static-libgcc -static-libstdc++)
-    elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU" AND NOT MINGW)
-        find_package(OpenMP QUIET)
-        if(OpenMP_CXX_FOUND)
-            target_link_libraries(${EXAMPLE_NAME} OpenMP::OpenMP_CXX)
-        endif()
-    elseif(MSVC)
-        target_compile_options(${EXAMPLE_NAME} PRIVATE /openmp)
+        target_link_options(${EXAMPLE_NAME} PRIVATE -static-libgcc -static-libstdc++)
     endif()
 
     if(MSVC)

@@ -60,7 +60,7 @@ public:
             Tee(md, "| Sweep |     Energy |    Delta | Result |\n");
             Tee(md, "|-------|------------|----------|--------|\n");
 
-            float prev_energy = net->Energy(state.data());
+            float prev_energy = net->Energy(state.data()).value();
             Tee(md, Fmt("| %5d | %10.4f |       -- |   --   |\n", 0, prev_energy));
 
             size_t stable_count = 0;
@@ -68,7 +68,7 @@ public:
             for (size_t sweep = 1; sweep <= max_sweeps; ++sweep)
             {
                 net->Recall(state.data(), 1);  // single sweep
-                const float energy = net->Energy(state.data());
+                const float energy = net->Energy(state.data()).value();
                 const float delta = energy - prev_energy;
 
                 const bool mono = (delta <= epsilon);

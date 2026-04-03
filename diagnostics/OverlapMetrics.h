@@ -64,9 +64,9 @@ public:
                 const float* orig = patterns.data() + p * N;
                 CorruptPattern<N>(orig, noisy.data(), noise, rng);
 
-                const size_t sweeps = net->Recall(noisy.data(), 100);
+                const auto result = net->Recall(noisy.data(), 100);
                 total_target[p] += ComputeOverlap<N>(orig, noisy.data());
-                total_sweeps[p] += static_cast<float>(sweeps);
+                total_sweeps[p] += static_cast<float>(result.steps);
 
                 float max_cross = -2.0f;
                 for (size_t q = 0; q < num_patterns; ++q)

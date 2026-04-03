@@ -5,11 +5,11 @@
 
 #include <algorithm>
 #include <bit>
-#include <cassert>
 #include <cmath>
 #include <cstring>
 #include <limits>
 #include <numeric>
+#include <stdexcept>
 
 // Explicit template instantiations for supported DIM values (4-16)
 template class HopfieldNetwork<4>;
@@ -29,12 +29,17 @@ template class HopfieldNetwork<16>;
 // --- Construction and initialization ---
 
 template <size_t DIM>
-HopfieldNetwork<DIM>::HopfieldNetwork(uint64_t rng_seed, size_t reach, float beta, float connectivity)
-    : reach_(reach), beta_(beta), connectivity_(connectivity), rng_(rng_seed)
+HopfieldNetwork<DIM>::HopfieldNetwork(uint64_t rng_seed, size_t reach, float beta, float neighbor_fraction, float tolerance)
+    : reach_(reach), beta_(beta), neighbor_fraction_(neighbor_fraction), tolerance_(tolerance), rng_(rng_seed)
 {
-    assert(reach_ >= 1 && reach_ <= DIM);
-    assert(beta_ > 0.0f);
-    assert(connectivity_ > 0.0f && connectivity_ <= 1.0f);
+    if (reach_ < 1 || reach_ > DIM)
+        throw std::invalid_argument("reach must be in [1, DIM]");
+    if (beta_ <= 0.0f)
+        throw std::invalid_argument("beta must be positive");
+    if (neighbor_fraction_ <= 0.0f || neighbor_fraction_ > 1.0f)
+        throw std::invalid_argument("neighbor_fraction must be in (0.0, 1.0]");
+    if (tolerance_ < 0.0f)
+        throw std::invalid_argument("tolerance must be non-negative");
     BuildMaskTable();
     Initialize();
 }
@@ -56,11 +61,11 @@ void HopfieldNetwork<DIM>::BuildMaskTable()
             return std::popcount(a) < std::popcount(b);
         });
 
-    // Truncate to connectivity fraction
-    if (connectivity_ < 1.0f)
+    // Truncate to neighbor_fraction
+    if (neighbor_fraction_ < 1.0f)
     {
         const size_t keep = std::max(size_t{1},
-            static_cast<size_t>(static_cast<float>(conn_masks_.size()) * connectivity_));
+            static_cast<size_t>(static_cast<float>(conn_masks_.size()) * neighbor_fraction_));
         conn_masks_.resize(keep);
     }
 }
@@ -106,12 +111,12 @@ void HopfieldNetwork<DIM>::StorePattern(const float* pattern)
 }
 
 template <size_t DIM>
-size_t HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps)
+RecallResult HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps)
 {
     if (num_patterns_ == 0)
     {
         // Nothing to recall against -- return input unchanged.
-        return 0;
+        return {0, false};
     }
 
     EnsureTransposed();
@@ -129,7 +134,7 @@ size_t HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps)
             const size_t v = perm_[idx];
             const float old_val = vtx_state_[v];
             UpdateVertex(v);
-            if (std::fabs(vtx_state_[v] - old_val) > 1e-6f)
+            if (std::fabs(vtx_state_[v] - old_val) > tolerance_)
                 changed = true;
         }
 
@@ -137,21 +142,21 @@ size_t HopfieldNetwork<DIM>::Recall(float* state, size_t max_steps)
         {
             // Converged -- copy result back
             std::copy(vtx_state_, vtx_state_ + N, state);
-            return step + 1;
+            return {step + 1, true};
         }
     }
 
     // Did not converge within max_steps
     std::copy(vtx_state_, vtx_state_ + N, state);
-    return max_steps;
+    return {max_steps, false};
 }
 
 template <size_t DIM>
-float HopfieldNetwork<DIM>::Energy(const float* state) const
+std::optional<float> HopfieldNetwork<DIM>::Energy(const float* state) const
 {
     // Modern Hopfield energy: per-vertex log-sum-exp of pattern similarities.
     // Uses transposed pattern layout for cache-friendly access.
-    if (num_patterns_ == 0) return 0.0f;
+    if (num_patterns_ == 0) return std::nullopt;
     EnsureTransposed();
 
     const float inv_beta = 1.0f / beta_;
@@ -161,39 +166,36 @@ float HopfieldNetwork<DIM>::Energy(const float* state) const
     const float* pt = patterns_t_.data();
     float energy = 0.0f;
 
-    #pragma omp parallel reduction(+:energy)
+    energy_buf_.resize(M);
+    float* sim = energy_buf_.data();
+
+    for (size_t v = 0; v < N; ++v)
     {
-        std::vector<float> sim(M);
+        // Zero sim buffer
+        std::memset(sim, 0, M * sizeof(float));
 
-        #pragma omp for schedule(static)
-        for (size_t v = 0; v < N; ++v)
+        // Connection-outer, pattern-inner: each iteration is a saxpy
+        // sim[mu] += state[nb] * patterns_t[nb * M + mu]  (contiguous access)
+        for (size_t c = 0; c < num_masks; ++c)
         {
-            // Zero sim buffer
-            std::memset(sim.data(), 0, M * sizeof(float));
-
-            // Connection-outer, pattern-inner: each iteration is a saxpy
-            // sim[mu] += state[nb] * patterns_t[nb * M + mu]  (contiguous access)
-            for (size_t c = 0; c < num_masks; ++c)
-            {
-                const size_t nb = v ^ masks[c];
-                const float nb_state = state[nb];
-                const float* pt_nb = pt + nb * M;
-                for (size_t mu = 0; mu < M; ++mu)
-                    sim[mu] += nb_state * pt_nb[mu];
-            }
-
-            // Find max for numerical stability
-            float max_sim = -std::numeric_limits<float>::max();
+            const size_t nb = v ^ masks[c];
+            const float nb_state = state[nb];
+            const float* pt_nb = pt + nb * M;
             for (size_t mu = 0; mu < M; ++mu)
-                if (sim[mu] > max_sim) max_sim = sim[mu];
-
-            // Log-sum-exp
-            float sum_exp = 0.0f;
-            for (size_t mu = 0; mu < M; ++mu)
-                sum_exp += std::exp(beta_ * (sim[mu] - max_sim));
-
-            energy -= max_sim + inv_beta * std::log(sum_exp);
+                sim[mu] += nb_state * pt_nb[mu];
         }
+
+        // Find max for numerical stability
+        float max_sim = -std::numeric_limits<float>::max();
+        for (size_t mu = 0; mu < M; ++mu)
+            if (sim[mu] > max_sim) max_sim = sim[mu];
+
+        // Log-sum-exp
+        float sum_exp = 0.0f;
+        for (size_t mu = 0; mu < M; ++mu)
+            sum_exp += std::exp(beta_ * (sim[mu] - max_sim));
+
+        energy -= max_sim + inv_beta * std::log(sum_exp);
     }
 
     return energy / static_cast<float>(N);
@@ -256,4 +258,38 @@ void HopfieldNetwork<DIM>::UpdateVertex(size_t v)
         h += (sim[mu] * inv_sum) * pt_v[mu];
 
     vtx_state_[v] = h;
+}
+
+// --- Runtime DIM factory ---
+
+template <size_t DIM>
+static std::unique_ptr<IHopfieldNetwork> CreateForDim(
+    uint64_t rng_seed, size_t reach, float beta, float neighbor_fraction, float tolerance)
+{
+    if (reach == 0) reach = DIM / 2;
+    return HopfieldNetwork<DIM>::Create(rng_seed, reach, beta, neighbor_fraction, tolerance);
+}
+
+std::unique_ptr<IHopfieldNetwork> CreateHopfieldNetwork(
+    size_t dim, uint64_t rng_seed,
+    size_t reach, float beta, float neighbor_fraction, float tolerance)
+{
+    switch (dim)
+    {
+        case  4: return CreateForDim< 4>(rng_seed, reach, beta, neighbor_fraction, tolerance);
+        case  5: return CreateForDim< 5>(rng_seed, reach, beta, neighbor_fraction, tolerance);
+        case  6: return CreateForDim< 6>(rng_seed, reach, beta, neighbor_fraction, tolerance);
+        case  7: return CreateForDim< 7>(rng_seed, reach, beta, neighbor_fraction, tolerance);
+        case  8: return CreateForDim< 8>(rng_seed, reach, beta, neighbor_fraction, tolerance);
+        case  9: return CreateForDim< 9>(rng_seed, reach, beta, neighbor_fraction, tolerance);
+        case 10: return CreateForDim<10>(rng_seed, reach, beta, neighbor_fraction, tolerance);
+        case 11: return CreateForDim<11>(rng_seed, reach, beta, neighbor_fraction, tolerance);
+        case 12: return CreateForDim<12>(rng_seed, reach, beta, neighbor_fraction, tolerance);
+        case 13: return CreateForDim<13>(rng_seed, reach, beta, neighbor_fraction, tolerance);
+        case 14: return CreateForDim<14>(rng_seed, reach, beta, neighbor_fraction, tolerance);
+        case 15: return CreateForDim<15>(rng_seed, reach, beta, neighbor_fraction, tolerance);
+        case 16: return CreateForDim<16>(rng_seed, reach, beta, neighbor_fraction, tolerance);
+        default:
+            throw std::invalid_argument("dim must be in [4, 16]");
+    }
 }

@@ -6,8 +6,62 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <span>
+#include <stdexcept>
 #include <vector>
 #include <random>
+
+/// Result returned by HopfieldNetwork::Recall().
+struct RecallResult
+{
+    size_t steps; ///< Number of update sweeps performed (0 if no patterns stored).
+    bool converged; ///< True if the state stabilized within tolerance.
+};
+
+/// Type-erased interface for HopfieldNetwork.
+///
+/// Allows runtime DIM selection -- SDK bindings (Python, etc.) hold a
+/// unique_ptr<IHopfieldNetwork> and dispatch through virtual calls.
+/// All buffer-accepting methods use std::span with runtime size validation.
+class IHopfieldNetwork
+{
+public:
+    virtual ~IHopfieldNetwork() = default;
+
+    [[nodiscard]] virtual size_t Dim() const = 0;
+    [[nodiscard]] virtual size_t NumVertices() const = 0;
+
+    virtual void StorePattern(std::span<const float> pattern) = 0;
+    virtual RecallResult Recall(std::span<float> state, size_t max_steps = 100) = 0;
+    [[nodiscard]] virtual std::optional<float> Energy(std::span<const float> state) const = 0;
+
+    [[nodiscard]] virtual size_t NumPatterns() const = 0;
+    [[nodiscard]] virtual size_t Reach() const = 0;
+    [[nodiscard]] virtual size_t NumConnections() const = 0;
+    [[nodiscard]] virtual float NeighborFraction() const = 0;
+    [[nodiscard]] virtual float Beta() const = 0;
+    [[nodiscard]] virtual float Tolerance() const = 0;
+
+    virtual void Clear() = 0;
+    [[nodiscard]] virtual std::span<const float> GetPattern(size_t idx) const = 0;
+    virtual void PopPattern() = 0;
+};
+
+/// Factory: create a HopfieldNetwork with DIM chosen at runtime.
+/// @param dim Hypercube dimension (4-16).
+/// @param rng_seed Random seed for update order permutations.
+/// @param reach Max Hamming distance (0 = dim/2 default).
+/// @param beta Inverse temperature for softmax attention.
+/// @param neighbor_fraction Fraction of Hamming ball to use (0.0-1.0).
+/// @param tolerance Convergence threshold for Recall().
+/// @throws std::invalid_argument if dim is outside [4, 16].
+std::unique_ptr<IHopfieldNetwork> CreateHopfieldNetwork(
+    size_t dim, uint64_t rng_seed,
+    size_t reach = 0,
+    float beta = 4.0f,
+    float neighbor_fraction = 1.0f,
+    float tolerance = 1e-6f);
 
 /// Modern Hopfield associative memory on a hypercube graph.
 ///
@@ -24,8 +78,8 @@
 ///     ball). Neighbor lookup is a single XOR -- no adjacency storage required.
 ///   - Asynchronous updates: each sweep visits every vertex in random order,
 ///     replacing its state with the softmax-attention output over its neighbors.
-///   - Convergence is detected when no vertex changes by more than 1e-6 in a
-///     full sweep.
+///   - Convergence is detected when no vertex changes by more than `tolerance`
+///     (default 1e-6) in a full sweep.
 ///
 /// Usage:
 ///   auto net = HopfieldNetwork<8>::Create(seed);
@@ -33,7 +87,7 @@
 ///   net->StorePattern(pattern2);
 ///   net->Recall(noisy_cue);  // noisy_cue converges to nearest stored pattern
 template <size_t DIM>
-class HopfieldNetwork
+class HopfieldNetwork : public IHopfieldNetwork
 {
     static_assert(DIM >= 4 && DIM <= 16, "DIM must be in 4 <= DIM <= 16");
 
@@ -49,74 +103,110 @@ public:
     ///              Default DIM/2 gives ~50-63% connectivity.
     /// @param beta Inverse temperature for softmax attention. Higher values
     ///             give sharper retrieval (closer to winner-take-all).
-    /// @param connectivity Fraction of the Hamming ball to use (0.0-1.0).
-    ///                     Masks are sorted by distance (closest first) then
-    ///                     truncated. Default 1.0 uses the full ball.
+    /// @param neighbor_fraction Fraction of the Hamming ball to use (0.0-1.0).
+    ///                          Masks are sorted by distance (closest first)
+    ///                          then truncated. Default 1.0 uses the full ball.
+    /// @param tolerance Convergence threshold for Recall(). A sweep is
+    ///                  considered stable when no vertex changes by more than
+    ///                  this value.
     static std::unique_ptr<HopfieldNetwork> Create(uint64_t rng_seed,
                                                    size_t reach = DIM / 2,
                                                    float beta = 4.0f,
-                                                   float connectivity = 1.0f)
+                                                   float neighbor_fraction = 1.0f,
+                                                   float tolerance = 1e-6f)
     {
-        return std::unique_ptr<HopfieldNetwork>(new HopfieldNetwork(rng_seed, reach, beta, connectivity));
+        return std::unique_ptr<HopfieldNetwork>(
+            new HopfieldNetwork(rng_seed, reach, beta, neighbor_fraction, tolerance));
     }
 
     HopfieldNetwork(const HopfieldNetwork&) = delete;
     HopfieldNetwork& operator=(const HopfieldNetwork&) = delete;
 
+    // --- IHopfieldNetwork overrides (span-based, size-validated) ---
+
+    [[nodiscard]] size_t Dim() const override { return DIM; }
+    [[nodiscard]] size_t NumVertices() const override { return N; }
+
+    void StorePattern(std::span<const float> pattern) override
+    {
+        if (pattern.size() != N)
+            throw std::invalid_argument("pattern must have exactly num_vertices elements");
+        StorePattern(pattern.data());
+    }
+
+    RecallResult Recall(std::span<float> state, size_t max_steps = 100) override
+    {
+        if (state.size() != N)
+            throw std::invalid_argument("state must have exactly num_vertices elements");
+        return Recall(state.data(), max_steps);
+    }
+
+    [[nodiscard]] std::optional<float> Energy(std::span<const float> state) const override
+    {
+        if (state.size() != N)
+            throw std::invalid_argument("state must have exactly num_vertices elements");
+        return Energy(state.data());
+    }
+
+    [[nodiscard]] size_t NumPatterns() const override { return num_patterns_; }
+    [[nodiscard]] size_t Reach() const override { return reach_; }
+    [[nodiscard]] size_t NumConnections() const override { return conn_masks_.size(); }
+    [[nodiscard]] float NeighborFraction() const override { return neighbor_fraction_; }
+    [[nodiscard]] float Beta() const override { return beta_; }
+    [[nodiscard]] float Tolerance() const override { return tolerance_; }
+
+    void Clear() override;
+
+    [[nodiscard]] std::span<const float> GetPattern(size_t idx) const override
+    {
+        if (idx >= num_patterns_)
+            throw std::out_of_range("pattern index out of range");
+        return {patterns_.data() + idx * N, N};
+    }
+
+    void PopPattern() override
+    {
+        if (num_patterns_ == 0)
+            throw std::out_of_range("no patterns to remove");
+        patterns_.resize(patterns_.size() - N);
+        --num_patterns_;
+        sim_buf_.resize(num_patterns_);
+        patterns_dirty_ = true;
+    }
+
+    // --- Raw-pointer convenience methods (no virtual dispatch) ---
+
     /// @brief Store a pattern into the network (explicit storage, not Hebbian).
-    /// @param pattern Array of N floats (continuous-valued).
+    /// @param pattern Pointer to N floats (continuous-valued).
     void StorePattern(const float* pattern);
 
     /// @brief Run asynchronous updates until convergence or max_steps.
-    /// @param state In/out: N-element state array (continuous-valued). Modified in place.
+    /// @param state In/out: pointer to N-element state array. Modified in place.
     /// @param max_steps Maximum update sweeps before declaring non-convergence.
-    /// @return 0 if no patterns stored (input unchanged), 1..max_steps-1 if
-    ///         converged, max_steps if not converged.
-    size_t Recall(float* state, size_t max_steps = 100);
+    RecallResult Recall(float* state, size_t max_steps = 100);
 
     /// @brief Compute modern Hopfield energy for the given state.
-    /// E(s) = -(1/N) * sum_v lse(beta, sim_v) where sim_v are per-vertex
-    /// pattern similarities through Hamming-ball neighbors.
-    [[nodiscard]] float Energy(const float* state) const;
-
-    /// @brief Number of patterns currently stored.
-    [[nodiscard]] size_t NumPatterns() const { return num_patterns_; }
-
-    /// @brief Hamming-ball radius (max Hamming distance for neighbors).
-    [[nodiscard]] size_t Reach() const { return reach_; }
-
-    /// @brief Number of connections per vertex (after connectivity truncation).
-    [[nodiscard]] size_t NumConnections() const { return conn_masks_.size(); }
-
-    /// @brief Connectivity fraction (0.0-1.0).
-    [[nodiscard]] float Connectivity() const { return connectivity_; }
-
-    /// @brief Inverse temperature parameter.
-    [[nodiscard]] float Beta() const { return beta_; }
-
-    /// @brief Clear all stored patterns.
-    void Clear();
-
-    /// @brief Pointer to the internal N-element vertex state array.
-    /// Valid after Recall(); reflects the converged (or last) state.
-    [[nodiscard]] const float* State() const { return vtx_state_; }
+    /// @return Energy value, or nullopt if no patterns are stored.
+    [[nodiscard]] std::optional<float> Energy(const float* state) const;
 
 private:
-    HopfieldNetwork(uint64_t rng_seed, size_t reach, float beta, float connectivity);
+    HopfieldNetwork(uint64_t rng_seed, size_t reach, float beta, float neighbor_fraction, float tolerance);
 
-    size_t reach_;           // Hamming-ball radius (1..DIM)
-    float beta_;             // inverse temperature for softmax attention
-    float connectivity_;     // fraction of Hamming ball used (0.0-1.0)
+    size_t reach_; // Hamming-ball radius (1..DIM)
+    float beta_; // inverse temperature for softmax attention
+    float neighbor_fraction_; // fraction of Hamming ball used (0.0-1.0)
+    float tolerance_; // convergence threshold for Recall
     size_t num_patterns_ = 0;
-    std::mt19937_64 rng_;    // persists across Recall() calls for varied orderings
+    std::mt19937_64 rng_; // persists across Recall() calls for varied orderings
 
     alignas(64) float vtx_state_[N]{};
-    std::vector<float> patterns_;    // row-major [num_patterns_ * N] for StorePattern
-    mutable std::vector<float> patterns_t_;  // col-major [N * num_patterns_] for fast Recall
-    mutable bool patterns_dirty_ = true;     // true when patterns_t_ needs rebuild
-    std::vector<float> sim_buf_;     // reusable similarity buffer [num_patterns_]
-    std::vector<size_t> perm_;       // reusable permutation array for Recall [N]
-    std::vector<uint32_t> conn_masks_;  // precomputed neighbor masks: popcount(m) <= reach_
+    std::vector<float> patterns_; // row-major [num_patterns_ * N] for StorePattern
+    mutable std::vector<float> patterns_t_; // col-major [N * num_patterns_] for fast Recall
+    mutable bool patterns_dirty_ = true; // true when patterns_t_ needs rebuild
+    std::vector<float> sim_buf_; // reusable similarity buffer [num_patterns_] for Recall
+    mutable std::vector<float> energy_buf_; // reusable similarity buffer [num_patterns_] for Energy
+    std::vector<size_t> perm_; // reusable permutation array for Recall [N]
+    std::vector<uint32_t> conn_masks_; // precomputed neighbor masks: popcount(m) <= reach_
 
     void Initialize();
     void BuildMaskTable();

@@ -79,7 +79,7 @@ int main()
         std::vector<float> query(N, 0.0f);
         std::copy(inputs[p].begin(), inputs[p].end(), query.begin());
 
-        const size_t steps = net->Recall(query.data());
+        const auto [steps, converged] = net->Recall(query.data());
 
         const float output_sim = ComputeOverlap<HALF>(
             outputs[p].data(), query.data() + HALF);

@@ -45,12 +45,12 @@ Run: DIM=8 | N=256 | reach=4 | beta=4.0 | noise=20% | ceiling=65536 | 3-seed avg
 |*32768 |    1.0000 |   1.0000 |    2.0 |  PASS  |
 |*65536 |    1.0000 |   1.0000 |    2.0 |  PASS  |
 
-Capacity (overlap >= 90%): >= 65536 patterns (25600.00% of N=256)
+Capacity (overlap >= 90%): 65536+ patterns (25600.00% of N=256)
 (ceiling reached -- increase max_patterns to probe higher)
 Result: **PASS**
 
 ## Findings
 
-- **Capacity >= 65536 patterns (ceiling reached).** The network showed perfect
+- **Capacity: 65536+ patterns (ceiling reached).** The network showed perfect
   recall at all tested counts. The true capacity is higher -- increase
   max_patterns to probe further.

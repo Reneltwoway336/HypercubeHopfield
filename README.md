@@ -28,7 +28,7 @@ Vertices are addressed by DIM-bit binary strings; each holds a continuous-valued
 Each vertex connects to all neighbors within a **Hamming ball** of configurable radius.
 Neighbor lookup is a single XOR instruction -- no adjacency list is stored. The mask
 table is sorted by Hamming distance (closest first) and optionally truncated by a
-`connectivity` parameter (0.0-1.0) for tunable sparsity.
+`neighbor_fraction` parameter (0.0-1.0) for tunable sparsity.
 
 At DIM=8 (N=256) with default reach=DIM/2=4 (162 connections, 63% of vertices), the
 network stores 65,000+ patterns with perfect recall in 2 sweeps -- over 250x the
@@ -46,8 +46,9 @@ cmake --build build
 ./build/HypercubeHopfield
 ```
 
-OpenMP is used for parallelism where beneficial. The build system detects MinGW,
-GCC/Clang, and MSVC automatically.
+OpenMP is optional; used only by the diagnostics suite (CapacityProbe) for parallel
+trial execution. The core HopfieldNetwork class is single-threaded with no OpenMP
+dependency. The build system detects MinGW, GCC/Clang, and MSVC automatically.
 
 ## Project Structure
 

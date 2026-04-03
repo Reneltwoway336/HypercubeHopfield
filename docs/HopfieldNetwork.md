@@ -30,18 +30,18 @@ classical ~0.14N limit and scales super-linearly with DIM.
 Each vertex connects to neighbors within a **Hamming ball** of radius `reach`.
 A vertex u is a neighbor of v if `popcount(v ^ u) <= reach`. The mask table is
 precomputed once at construction, sorted by Hamming distance (closest first),
-then optionally truncated by the `connectivity` parameter.
+then optionally truncated by the `neighbor_fraction` parameter.
 
 ### Mask Table Construction
 
 1. Enumerate all nonzero masks m < N with `popcount(m) <= reach`
 2. Sort by `popcount` (stable, so masks at same distance preserve order)
-3. Truncate to `floor(size * connectivity)` masks (minimum 1)
+3. Truncate to `floor(size * neighbor_fraction)` masks (minimum 1)
 
 XOR with vertex index gives the neighbor: `nb = v ^ m`. No per-vertex adjacency
 storage -- every vertex uses the same mask table.
 
-### Connection Counts (full ball, connectivity=1.0)
+### Connection Counts (full ball, neighbor_fraction=1.0)
 
 | DIM | N    | reach=DIM/2 | Connections | % of N |
 |-----|------|-------------|-------------|--------|
@@ -52,12 +52,12 @@ storage -- every vertex uses the same mask table.
 | 9   | 512  | 4           | 255         | 50%    |
 | 10  | 1024 | 5           | 637         | 62%    |
 
-### Connectivity Tuning
+### Neighbor Fraction Tuning
 
-The `connectivity` parameter (0.0-1.0) truncates the sorted mask table:
-- `connectivity=1.0`: full Hamming ball (max capacity, slowest)
-- `connectivity=0.5`: closest ~50% of neighbors (~2x faster)
-- `connectivity=0.1`: very sparse, fast, explores capacity-speed tradeoff
+The `neighbor_fraction` parameter (0.0-1.0) truncates the sorted mask table:
+- `neighbor_fraction=1.0`: full Hamming ball (max capacity, slowest)
+- `neighbor_fraction=0.5`: closest ~50% of neighbors (~2x faster)
+- `neighbor_fraction=0.1`: very sparse, fast, explores capacity-speed tradeoff
 
 Since masks are sorted by distance, truncation always keeps the closest
 neighbors and drops the most distant ones first.
@@ -110,7 +110,7 @@ a weight matrix). This enables:
 | DIM          | Hypercube dimension (4-16)                       | Template |
 | reach        | Hamming-ball radius (1-DIM)                      | DIM/2    |
 | beta         | Inverse temperature for softmax attention        | 4.0      |
-| connectivity | Fraction of Hamming ball to use (0.0-1.0)        | 1.0      |
+| neighbor_fraction | Fraction of Hamming ball to use (0.0-1.0)   | 1.0      |
 | rng_seed     | Random seed for update order                     | Required |
 | max_steps    | Maximum recall sweeps                            | 100      |
 

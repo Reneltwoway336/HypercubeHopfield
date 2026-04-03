@@ -58,9 +58,9 @@ public:
                 std::vector<float> noisy(N);
                 CorruptPattern<N>(pattern.data(), noisy.data(), noise_levels[lvl], rng);
 
-                const size_t sweeps = net->Recall(noisy.data(), 100);
+                const auto result = net->Recall(noisy.data(), 100);
                 total_overlap += ComputeOverlap<N>(pattern.data(), noisy.data());
-                total_sweeps += static_cast<float>(sweeps);
+                total_sweeps += static_cast<float>(result.steps);
             }
 
             const float avg_overlap = total_overlap / seed_count;
