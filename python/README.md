@@ -1,6 +1,7 @@
-# HypercubeHopfield
+# HypercubeHopfield: Modern Hopfield Associative Memory
 
-Modern Hopfield associative memory on Boolean hypercube graphs.
+Pattern storage and recall on Boolean hypercube graphs, with exponential
+capacity and softmax attention over sparse Hamming-ball neighborhoods.
 
 ## Installation
 
@@ -23,8 +24,8 @@ net.store_patterns(patterns)
 
 # Recall from a noisy cue
 cue = patterns[0] + np.random.randn(net.num_vertices).astype(np.float32) * 0.3
-recalled, steps, converged = net.recall(cue)
-print(f"Converged: {converged}, steps: {steps}")
+result = net.recall(cue)
+print(f"Converged: {result.converged}, steps: {result.steps}")
 ```
 
 ## Features
@@ -32,7 +33,7 @@ print(f"Converged: {converged}, steps: {steps}")
 - **Explicit pattern storage** with exponential capacity
 - **Softmax attention** over sparse Hamming-ball neighborhoods
 - **Two update modes**: Sync (deterministic, GPU-portable) and Async (guaranteed energy descent)
-- **Pickle support** for saving/loading trained networks
+- **Pickle support** for saving/loading networks
 - **NumPy integration** with automatic float32 conversion
 
 ## Documentation
